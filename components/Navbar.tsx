@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import Image from 'next/image';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -17,7 +18,7 @@ export default function Navbar() {
     signOut({ callbackUrl: '/' });
   };
 
-  const isActive = (path: string) => pathname === path;
+//   const isActive = (path: string) => pathname === path;
 
   return (
     <nav className="bg-gradient-to-r from-gray-900 to-gray-800 text-white shadow-lg sticky top-0 z-50">
@@ -78,8 +79,10 @@ export default function Navbar() {
                   {/* User Avatar */}
                   <div className="relative">
                     {session.user?.image ? (
-                      <img
+                      <Image
                         className="h-8 w-8 rounded-full object-cover border-2 border-gray-600"
+                        width={100} 
+                        height={100}
                         src={session.user.image}
                         alt={session.user.name || 'User avatar'}
                         onError={(e) => {
@@ -136,8 +139,10 @@ export default function Navbar() {
                       <div className="px-4 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
                         <div className="flex items-center space-x-3">
                           {session.user?.image ? (
-                            <img
+                            <Image
                               className="h-12 w-12 rounded-full object-cover ring-2 ring-white shadow-sm"
+                              width={100} 
+                              height={100}
                               src={session.user.image}
                               alt={session.user.name || 'User avatar'}
                               onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
