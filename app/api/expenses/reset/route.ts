@@ -1,6 +1,7 @@
+// app/api/expenses/reset/route.ts
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { PrismaClient, CategoryType } from "@prisma/client";
+import { PrismaClient, CategoryType, Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 const prisma = new PrismaClient();
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const where: any = { userId: user.id };
+  const where: Prisma.ExpenseWhereInput = { userId: user.id };
 
   if (startDate && endDate) {
     where.createdAt = {

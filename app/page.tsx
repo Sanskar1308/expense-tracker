@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 
 // Types based on your Prisma schema
@@ -343,7 +343,7 @@ const Dashboard = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [resetInfo, setResetInfo] = useState({ dateRange: '', category: '' });
 
-  const fetchExpenses = async () => {
+  const fetchExpenses = useCallback(async () => {
     try {
       const response = await fetch('/api/expenses');
       if (response.ok) {
@@ -370,7 +370,7 @@ const Dashboard = () => {
         }
 
         setExpenses(filteredExpenses);
-
+  
         // Calculate category totals
         const totals = filteredExpenses.reduce((acc: Record<CategoryType, { total: number; count: number }>, expense: Expense) => {
           if (!acc[expense.category]) {
@@ -386,7 +386,7 @@ const Dashboard = () => {
           total: data.total,
           count: data.count
         }));
-
+  
         setCategoryTotals(categoryTotalsArray.sort((a, b) => b.total - a.total));
       }
     } catch (error) {
@@ -394,15 +394,15 @@ const Dashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
+  }, [filter, customStartDate, customEndDate]);  // Add necessary dependencies
+  
   useEffect(() => {
     if (session) {
       fetchExpenses();
     } else if (status !== 'loading') {
       setIsLoading(false);
     }
-  }, [session, status, filter, customStartDate, customEndDate]);
+  }, [session, status, fetchExpenses]);
 
   const handleFilterChange = (selectedFilter: 'ALL' | 'WEEK' | 'MONTH' | 'CUSTOM') => {
     setFilter(selectedFilter);
