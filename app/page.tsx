@@ -30,12 +30,29 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const categories: { value: CategoryType; label: string }[] = [
-    { value: 'FOOD', label: 'Food' },
-    { value: 'TRANSPORT', label: 'Transport' },
-    { value: 'UTILITIES', label: 'Utilities' },
-    { value: 'ENTERTAINMENT', label: 'Entertainment' },
-    { value: 'OTHER', label: 'Other' }
+  const categories: { value: CategoryType; label: string; color: string }[] = [
+    { value: 'FOOD', label: 'Food', color: 'bg-orange-100 text-orange-800' },
+    { value: 'TRANSPORT', label: 'Transport', color: 'bg-blue-100 text-blue-800' },
+    { value: 'UTILITIES', label: 'Utilities', color: 'bg-green-100 text-green-800' },
+    { value: 'ENTERTAINMENT', label: 'Entertainment', color: 'bg-purple-100 text-purple-800' },
+    { value: 'OTHER', label: 'Other', color: 'bg-gray-100 text-gray-800' }
+  ];
+
+  // Common expense titles mapped to categories
+  const commonTitleToCategory: Record<string, CategoryType> = {
+    'Snacks': 'FOOD',
+    'Breakfast': 'FOOD',
+    'Groceries': 'FOOD',
+    'OTT': 'ENTERTAINMENT',
+    'Dinner': 'FOOD',
+    'Lunch': 'FOOD',
+    'Petrol': 'TRANSPORT',
+    'Shopping': 'OTHER',
+  };
+
+  // Common expense titles
+  const commonTitles = [
+    'Snacks', 'Breakfast', 'Groceries', 'OTT', 'Dinner', 'Lunch', 'Petrol', 'Shopping'
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,6 +86,19 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
     }
   };
 
+  const handleCommonTitleClick = (title: string) => {
+    // Auto-fill the title and category based on selected common title
+    setFormData({
+      ...formData,
+      title,
+      category: commonTitleToCategory[title] || 'OTHER',  // Set category based on the title
+    });
+  };
+
+  const handleCategoryClick = (category: CategoryType) => {
+    setFormData({ ...formData, category });
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex items-center justify-between mb-4">
@@ -96,6 +126,18 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
               placeholder="Enter expense title"
               required
             />
+            <div className="mt-2 flex justify-start space-x-2 overflow-x-auto pb-2">
+              {commonTitles.map((title) => (
+                <button
+                  key={title}
+                  type="button"
+                  onClick={() => handleCommonTitleClick(title)}
+                  className="bg-gray-200 text-gray-800 hover:bg-gray-300 rounded-full px-4 py-2 text-sm transition-colors whitespace-nowrap"
+                >
+                  {title}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>
@@ -117,17 +159,18 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Category
             </label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value as CategoryType })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+            <div className="flex space-x-2 mt-2">
               {categories.map((category) => (
-                <option key={category.value} value={category.value}>
+                <button
+                  key={category.value}
+                  type="button"
+                  onClick={() => handleCategoryClick(category.value)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${category.color} ${formData.category === category.value ? 'ring-2 ring-blue-500' : ''}`}
+                >
                   {category.label}
-                </option>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
           <div className="flex gap-3">
@@ -151,6 +194,7 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
     </div>
   );
 };
+
 
 // Recent Expenses Component
 const RecentExpenses = ({ expenses, onRefresh }: { expenses: Expense[]; onRefresh: () => void }) => {
@@ -289,22 +333,54 @@ const CategoryTotals = ({ categoryTotals }: { categoryTotals: CategoryTotal[] })
   );
 };
 
+// Helper function to filter by date range
+const filterExpensesByDate = (expenses: Expense[], startDate: Date, endDate: Date) => {
+  return expenses.filter(expense => {
+    const expenseDate = new Date(expense.createdAt);
+    return expenseDate >= startDate && expenseDate <= endDate;
+  });
+};
+
 // Main Dashboard Component
 const Dashboard = () => {
   const { data: session, status } = useSession();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categoryTotals, setCategoryTotals] = useState<CategoryTotal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState<'ALL' | 'WEEK' | 'MONTH' | 'CUSTOM'>('ALL');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
 
   const fetchExpenses = async () => {
     try {
       const response = await fetch('/api/expenses');
       if (response.ok) {
         const data = await response.json();
-        setExpenses(data);
-        
+        let filteredExpenses = data;
+
+        // Apply the selected filter
+        const currentDate = new Date();
+        if (filter === 'WEEK') {
+          // Filter expenses for the current week
+          const startOfWeek = new Date(currentDate.setDate(currentDate.getDate() - currentDate.getDay()));
+          const endOfWeek = new Date(currentDate.setDate(currentDate.getDate() + 6));
+          filteredExpenses = filterExpensesByDate(filteredExpenses, startOfWeek, endOfWeek);
+        } else if (filter === 'MONTH') {
+          // Filter expenses for the current month
+          const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+          const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+          filteredExpenses = filterExpensesByDate(filteredExpenses, startOfMonth, endOfMonth);
+        } else if (filter === 'CUSTOM' && customStartDate && customEndDate) {
+          // Filter expenses for a custom date range
+          const startDate = new Date(customStartDate);
+          const endDate = new Date(customEndDate);
+          filteredExpenses = filterExpensesByDate(filteredExpenses, startDate, endDate);
+        }
+
+        setExpenses(filteredExpenses);
+
         // Calculate category totals
-        const totals = data.reduce((acc: Record<CategoryType, { total: number; count: number }>, expense: Expense) => {
+        const totals = filteredExpenses.reduce((acc: Record<CategoryType, { total: number; count: number }>, expense: Expense) => {
           if (!acc[expense.category]) {
             acc[expense.category] = { total: 0, count: 0 };
           }
@@ -334,7 +410,15 @@ const Dashboard = () => {
     } else if (status !== 'loading') {
       setIsLoading(false);
     }
-  }, [session, status]);
+  }, [session, status, filter, customStartDate, customEndDate]);
+
+  const handleFilterChange = (selectedFilter: 'ALL' | 'WEEK' | 'MONTH' | 'CUSTOM') => {
+    setFilter(selectedFilter);
+    if (selectedFilter !== 'CUSTOM') {
+      setCustomStartDate('');
+      setCustomEndDate('');
+    }
+  };
 
   if (status === 'loading' || isLoading) {
     return (
@@ -372,19 +456,50 @@ const Dashboard = () => {
           </p>
         </div>
 
+        {/* Filter Buttons */}
+        <div className="mb-6">
+          <div className="flex gap-4">
+            <button onClick={() => handleFilterChange('ALL')} className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg">
+              All Time
+            </button>
+            <button onClick={() => handleFilterChange('WEEK')} className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg">
+              This Week
+            </button>
+            <button onClick={() => handleFilterChange('MONTH')} className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg">
+              This Month
+            </button>
+            <button onClick={() => handleFilterChange('CUSTOM')} className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded-lg">
+              Custom Date
+            </button>
+          </div>
+
+          {filter === 'CUSTOM' && (
+            <div className="mt-4">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="p-2 border border-gray-300 rounded-lg mr-4"
+              />
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="p-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          )}
+        </div>
+
         {/* Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Add Expense - Full width on mobile, half on large screens */}
           <div className="lg:col-span-2">
             <AddExpense onExpenseAdded={fetchExpenses} />
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Recent Expenses */}
           <RecentExpenses expenses={expenses} onRefresh={fetchExpenses} />
-          
-          {/* Category Totals */}
           <CategoryTotals categoryTotals={categoryTotals} />
         </div>
       </div>
