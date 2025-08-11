@@ -339,7 +339,7 @@ const Dashboard = () => {
   const [filter, setFilter] = useState<'ALL' | 'WEEK' | 'MONTH' | 'CUSTOM'>('ALL');
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
-  const [resetCategory, setResetCategory] = useState<CategoryType | 'ALL'>('ALL');
+  const [resetCategory] = useState<CategoryType | 'ALL'>('ALL');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [resetInfo, setResetInfo] = useState({ dateRange: '', category: '' });
 
