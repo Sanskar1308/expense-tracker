@@ -50,10 +50,7 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
     'Shopping': 'OTHER',
   };
 
-  // Common expense titles
-  const commonTitles = [
-    'Snacks', 'Breakfast', 'Groceries', 'OTT', 'Dinner', 'Lunch', 'Petrol', 'Shopping'
-  ];
+  const commonTitles = ['Snacks', 'Breakfast', 'Groceries', 'OTT', 'Dinner', 'Lunch', 'Petrol', 'Shopping'];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,9 +59,7 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
     try {
       const response = await fetch('/api/expenses', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: formData.title,
           amount: parseFloat(formData.amount),
@@ -91,7 +86,7 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
     setFormData({
       ...formData,
       title,
-      category: commonTitleToCategory[title] || 'OTHER',  // Set category based on the title
+      category: commonTitleToCategory[title] || 'OTHER',
     });
   };
 
@@ -115,9 +110,7 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
       {isOpen && (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Title
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
             <input
               type="text"
               value={formData.title}
@@ -141,9 +134,7 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Amount
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
             <input
               type="number"
               step="0.01"
@@ -156,9 +147,7 @@ const AddExpense = ({ onExpenseAdded }: { onExpenseAdded: () => void }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Category
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
             <div className="flex space-x-2 mt-2">
               {categories.map((category) => (
                 <button
@@ -350,6 +339,9 @@ const Dashboard = () => {
   const [filter, setFilter] = useState<'ALL' | 'WEEK' | 'MONTH' | 'CUSTOM'>('ALL');
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
+  const [resetCategory, setResetCategory] = useState<CategoryType | 'ALL'>('ALL');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [resetInfo, setResetInfo] = useState({ dateRange: '', category: '' });
 
   const fetchExpenses = async () => {
     try {
@@ -419,6 +411,87 @@ const Dashboard = () => {
       setCustomEndDate('');
     }
   };
+  
+  const openResetModal = () => {
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+    const currentDate = new Date();
+  
+    if (filter === 'WEEK') {
+      startDate = new Date(currentDate);
+      startDate.setDate(currentDate.getDate() - currentDate.getDay());
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+    } else if (filter === 'MONTH') {
+      startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    } else if (filter === 'CUSTOM' && customStartDate && customEndDate) {
+      startDate = new Date(customStartDate);
+      endDate = new Date(customEndDate);
+    }
+  
+    const dateRangeText = startDate && endDate
+      ? `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`
+      : 'All Time';
+    const categoryText = resetCategory === 'ALL' ? 'All Categories' : resetCategory;
+  
+    setResetInfo({ dateRange: dateRangeText, category: categoryText });
+    setShowConfirmModal(true);
+  };
+
+  const confirmReset = async () => {
+    let startDate: string | null = null;
+    let endDate: string | null = null;
+  
+    if (filter === "WEEK") {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - start.getDay());
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      startDate = start.toISOString();
+      endDate = end.toISOString();
+    } 
+    else if (filter === "MONTH") {
+      const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const end = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      startDate = start.toISOString();
+      endDate = end.toISOString();
+    } 
+    else if (filter === "CUSTOM" && customStartDate && customEndDate) {
+      const start = new Date(customStartDate);
+      const end = new Date(customEndDate);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        startDate = start.toISOString();
+        endDate = end.toISOString();
+      }
+    }
+  
+    try {
+      const res = await fetch("/api/expenses/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          category: resetCategory === "ALL" ? null : resetCategory
+        }),
+      });
+  
+      if (res.ok) {
+        const result = await res.json();
+        console.log(`${result.deletedCount} expenses deleted`);
+        setShowConfirmModal(false);
+        fetchExpenses();
+      } else {
+        console.error("Failed to delete expenses");
+      }
+    } catch (err) {
+      console.error("Error deleting expenses:", err);
+    }
+  };  
 
   if (status === 'loading' || isLoading) {
     return (
@@ -471,6 +544,12 @@ const Dashboard = () => {
             <button onClick={() => handleFilterChange('CUSTOM')} className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded-lg">
               Custom Date
             </button>
+            <button
+              onClick={openResetModal}
+              className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg"
+            >
+              Reset Expenses
+            </button>
           </div>
 
           {filter === 'CUSTOM' && (
@@ -490,6 +569,32 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+
+        {showConfirmModal && (
+          <div className="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md border border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Confirm Deletion</h2>
+              <p className="mb-2">You are about to delete expenses for:</p>
+              <p><strong>Date Range:</strong> {resetInfo.dateRange}</p>
+              <p><strong>Category:</strong> {resetInfo.category}</p>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={confirmReset}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg"
+                >
+                  Yes, Delete
+                </button>
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
