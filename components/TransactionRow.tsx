@@ -3,8 +3,13 @@
 import { Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { DEFAULT_CATEGORIES } from "../lib/categories";
 import type { Expense } from "../lib/types";
 import { formatRupee } from "../lib/utils";
+
+function categoryLabel(value: string) {
+  return DEFAULT_CATEGORIES.find((c) => c.value === value)?.label ?? value;
+}
 
 function methodBadge(expense: Expense) {
   if (expense.type === "CREDIT") return <Badge variant="credit">Credit</Badge>;
@@ -46,7 +51,7 @@ export default function TransactionRow({
         <p className="truncate font-medium text-stone-900">{expense.title}</p>
         <div className="flex flex-wrap items-center gap-1.5">
           {methodBadge(expense)}
-          <Badge>{expense.category}</Badge>
+          <Badge>{categoryLabel(expense.category)}</Badge>
           <span className="text-xs text-stone-500">{date}</span>
         </div>
       </div>

@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  CategoryType,
-  PaymentMethod,
-  TransactionType,
-} from "@prisma/client";
+import { PaymentMethod, TransactionType } from "@prisma/client";
 import { prisma } from "../../../../lib/prisma";
 import { requireUser } from "../../../../lib/session-user";
 import { validateTransactionPayload } from "../../../../lib/money";
@@ -63,7 +59,7 @@ export async function PATCH(req: Request, { params }: Params) {
     data: {
       title: String(body.title).trim(),
       amount,
-      category: body.category as CategoryType,
+      category: String(body.category).trim(),
       type,
       paymentMethod,
       cardId,

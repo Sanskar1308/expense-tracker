@@ -21,14 +21,7 @@ model User {
   expenses      Expense[]
   creditCards   CreditCard[]
   budgets       Budget[]
-}
-
-enum CategoryType {
-  FOOD
-  TRANSPORT
-  UTILITIES
-  ENTERTAINMENT
-  OTHER
+  categories    Category[]
 }
 
 enum TransactionType {
@@ -40,6 +33,17 @@ enum PaymentMethod {
   CASH
   UPI
   CC
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
 }
 
 model CreditCard {
@@ -54,28 +58,28 @@ model CreditCard {
 }
 
 model Budget {
-  id       String       @id @default(cuid())
+  id       String @id @default(cuid())
   amount   Float
   month    String
-  category CategoryType
+  category String
   userId   String
-  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, category, month])
 }
 
 model Expense {
-  id            String           @id @default(cuid())
+  id            String          @id @default(cuid())
   title         String
   amount        Float
-  createdAt     DateTime         @default(now())
-  user          User             @relation(fields: [userId], references: [id])
+  createdAt     DateTime        @default(now())
+  user          User            @relation(fields: [userId], references: [id])
   userId        String
-  category      CategoryType
-  type          TransactionType  @default(DEBIT)
+  category      String
+  type          TransactionType @default(DEBIT)
   paymentMethod PaymentMethod?
   cardId        String?
-  card          CreditCard?      @relation(fields: [cardId], references: [id])
+  card          CreditCard?     @relation(fields: [cardId], references: [id])
 }
 
 model Account {

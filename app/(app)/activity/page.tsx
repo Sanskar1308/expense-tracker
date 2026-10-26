@@ -6,8 +6,9 @@ import { Button } from "../../../components/ui/button";
 import { Label } from "../../../components/ui/label";
 import TransactionRow from "../../../components/TransactionRow";
 import EditTransactionDialog from "../../../components/activity/EditTransactionDialog";
+import type { CategoryOption } from "../../../lib/categories";
+import { DEFAULT_CATEGORIES } from "../../../lib/categories";
 import {
-  CATEGORIES,
   type Expense,
   type PaymentMethod,
   type TransactionType,
@@ -22,6 +23,9 @@ export default function ActivityPage() {
   const [range, setRange] = useState<"all" | "week" | "month">("month");
   const [editing, setEditing] = useState<Expense | null>(null);
   const [toast, setToast] = useState("");
+  const [categories, setCategories] = useState<CategoryOption[]>(
+    DEFAULT_CATEGORIES.map((c) => ({ ...c, custom: false }))
+  );
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
@@ -51,6 +55,15 @@ export default function ActivityPage() {
     const t = setTimeout(load, 200);
     return () => clearTimeout(t);
   }, [load]);
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.categories)) setCategories(data.categories);
+      })
+      .catch(() => undefined);
+  }, []);
 
   async function repeat(id: string) {
     const res = await fetch("/api/expenses/repeat", {
@@ -161,7 +174,7 @@ export default function ActivityPage() {
           >
             Any category
           </Button>
-          {CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <Button
               key={c.value}
               size="sm"

@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server";
-import { CategoryType } from "@prisma/client";
 import { prisma } from "../../../lib/prisma";
 import { requireUser } from "../../../lib/session-user";
 import { getMonthKey } from "../../../lib/money";
-
-const CATEGORIES: CategoryType[] = [
-  "FOOD",
-  "TRANSPORT",
-  "UTILITIES",
-  "ENTERTAINMENT",
-  "OTHER",
-];
+import { DEFAULT_CATEGORIES } from "../../../lib/categories";
 
 async function ensureMonthBudgets(userId: string, month: string) {
   const existing = await prisma.budget.findMany({
@@ -39,6 +31,17 @@ async function ensureMonthBudgets(userId: string, month: string) {
   return prisma.budget.findMany({ where: { userId, month } });
 }
 
+async function allowedCategories(userId: string): Promise<Set<string>> {
+  const custom = await prisma.category.findMany({
+    where: { userId, isActive: true },
+    select: { name: true },
+  });
+  return new Set([
+    ...DEFAULT_CATEGORIES.map((c) => c.value),
+    ...custom.map((c) => c.name),
+  ]);
+}
+
 export async function GET(req: Request) {
   const user = await requireUser();
   if (!user) {
@@ -64,11 +67,13 @@ export async function PUT(req: Request) {
       ? body.month
       : getMonthKey();
   const items = Array.isArray(body.items) ? body.items : [];
+  const allowed = await allowedCategories(user.id);
 
   for (const item of items) {
-    if (!CATEGORIES.includes(item.category)) {
+    const category = String(item.category ?? "").trim();
+    if (!allowed.has(category)) {
       return NextResponse.json(
-        { error: `Invalid category: ${item.category}` },
+        { error: `Invalid category: ${category}` },
         { status: 400 }
       );
     }
@@ -84,13 +89,13 @@ export async function PUT(req: Request) {
       where: {
         userId_category_month: {
           userId: user.id,
-          category: item.category,
+          category,
           month,
         },
       },
       create: {
         userId: user.id,
-        category: item.category,
+        category,
         month,
         amount,
       },

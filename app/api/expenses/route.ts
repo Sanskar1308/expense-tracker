@@ -1,10 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  CategoryType,
-  PaymentMethod,
-  Prisma,
-  TransactionType,
-} from "@prisma/client";
+import { PaymentMethod, Prisma, TransactionType } from "@prisma/client";
 import { prisma } from "../../../lib/prisma";
 import { requireUser } from "../../../lib/session-user";
 import { validateTransactionPayload } from "../../../lib/money";
@@ -40,7 +35,7 @@ export async function GET(req: Request) {
     where.paymentMethod = paymentMethod;
   }
   if (cardId) where.cardId = cardId;
-  if (category) where.category = category as CategoryType;
+  if (category) where.category = category;
   if (from || to) {
     where.createdAt = {};
     if (from) where.createdAt.gte = new Date(from);
@@ -100,7 +95,7 @@ export async function POST(req: Request) {
     data: {
       title: String(body.title).trim(),
       amount,
-      category: body.category as CategoryType,
+      category: String(body.category).trim(),
       type,
       paymentMethod,
       cardId,

@@ -10,9 +10,8 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import CategoryPicker from "../CategoryPicker";
 import {
-  CATEGORIES,
-  type CategoryType,
   type CreditCard,
   type Expense,
   type PaymentMethod,
@@ -33,7 +32,7 @@ export default function EditTransactionDialog({
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<TransactionType>("DEBIT");
-  const [category, setCategory] = useState<CategoryType>("OTHER");
+  const [category, setCategory] = useState("OTHER");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [cardId, setCardId] = useState("");
   const [cards, setCards] = useState<CreditCard[]>([]);
@@ -157,18 +156,11 @@ export default function EditTransactionDialog({
               )}
             </>
           )}
-          <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map((c) => (
-              <Button
-                key={c.value}
-                type="button"
-                size="sm"
-                variant={category === c.value ? "default" : "outline"}
-                onClick={() => setCategory(c.value)}
-              >
-                {c.label}
-              </Button>
-            ))}
+          <div>
+            <Label>Category</Label>
+            <div className="mt-2">
+              <CategoryPicker value={category} onChange={setCategory} />
+            </div>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button className="w-full" onClick={save} disabled={saving}>

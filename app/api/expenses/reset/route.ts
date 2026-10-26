@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { CategoryType, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../../../lib/prisma";
 import { requireUser } from "../../../../lib/session-user";
 
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   }
 
   if (category) {
-    where.category = category as CategoryType;
+    where.category = String(category);
   }
 
   const deleted = await prisma.expense.deleteMany({ where });

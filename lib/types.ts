@@ -1,10 +1,3 @@
-export type CategoryType =
-  | "FOOD"
-  | "TRANSPORT"
-  | "UTILITIES"
-  | "ENTERTAINMENT"
-  | "OTHER";
-
 export type TransactionType = "CREDIT" | "DEBIT";
 export type PaymentMethod = "CASH" | "UPI" | "CC";
 
@@ -21,7 +14,7 @@ export type Expense = {
   title: string;
   amount: number;
   createdAt: string;
-  category: CategoryType;
+  category: string;
   type: TransactionType;
   paymentMethod: PaymentMethod | null;
   cardId: string | null;
@@ -47,15 +40,7 @@ export type SummaryResponse = {
   recent: Expense[];
 };
 
-export const CATEGORIES: { value: CategoryType; label: string }[] = [
-  { value: "FOOD", label: "Food" },
-  { value: "TRANSPORT", label: "Transport" },
-  { value: "UTILITIES", label: "Utilities" },
-  { value: "ENTERTAINMENT", label: "Entertainment" },
-  { value: "OTHER", label: "Other" },
-];
-
-export const COMMON_TITLES: Record<string, CategoryType> = {
+export const COMMON_TITLES: Record<string, string> = {
   Snacks: "FOOD",
   Breakfast: "FOOD",
   Groceries: "FOOD",

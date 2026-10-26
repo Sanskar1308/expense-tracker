@@ -1,49 +1,67 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { CATEGORIES, type CategoryType } from "../../lib/types";
+import CategoryPicker from "../CategoryPicker";
+import type { CategoryOption } from "../../lib/categories";
+import { DEFAULT_CATEGORIES } from "../../lib/categories";
 
-type BudgetRow = { category: CategoryType; amount: number };
+type BudgetRow = { category: string; amount: number };
 
 export default function BudgetsManager() {
   const [month, setMonth] = useState("");
-  const [amounts, setAmounts] = useState<Record<CategoryType, string>>({
-    FOOD: "",
-    TRANSPORT: "",
-    UTILITIES: "",
-    ENTERTAINMENT: "",
-    OTHER: "",
-  });
+  const [categories, setCategories] = useState<CategoryOption[]>(
+    DEFAULT_CATEGORIES.map((c) => ({ ...c, custom: false }))
+  );
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
+  const applyCategories = useCallback((cats: CategoryOption[], budgets?: BudgetRow[]) => {
+    setCategories(cats);
+    setAmounts((prev) => {
+      const next: Record<string, string> = {};
+      for (const c of cats) next[c.value] = prev[c.value] ?? "";
+      if (budgets) {
+        for (const b of budgets) next[b.category] = String(b.amount);
+      }
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
-    fetch("/api/budgets")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data?.month) return;
-        setMonth(data.month);
-        const next = { ...amounts };
-        for (const c of CATEGORIES) next[c.value] = "";
-        for (const b of data.budgets as BudgetRow[]) {
-          next[b.category] = String(b.amount);
-        }
-        setAmounts(next);
+    Promise.all([
+      fetch("/api/budgets").then((r) => r.json()),
+      fetch("/api/categories").then((r) => r.json()),
+    ])
+      .then(([budgetData, categoryData]) => {
+        const cats: CategoryOption[] = Array.isArray(categoryData.categories)
+          ? categoryData.categories
+          : DEFAULT_CATEGORIES.map((c) => ({ ...c, custom: false }));
+        if (budgetData?.month) setMonth(budgetData.month);
+        applyCategories(cats, budgetData?.budgets);
       })
       .catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [applyCategories]);
+
+  async function refreshCategories() {
+    const res = await fetch("/api/categories");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (Array.isArray(data.categories)) applyCategories(data.categories);
+  }
 
   async function save() {
     setSaving(true);
     setMessage("");
     try {
-      const items = CATEGORIES.map((c) => ({
-        category: c.value,
-        amount: parseFloat(amounts[c.value] || "0") || 0,
-      })).filter((i) => i.amount > 0);
+      const items = categories
+        .map((c) => ({
+          category: c.value,
+          amount: parseFloat(amounts[c.value] || "0") || 0,
+        }))
+        .filter((i) => i.amount > 0);
 
       const res = await fetch("/api/budgets", {
         method: "PUT",
@@ -65,15 +83,21 @@ export default function BudgetsManager() {
           Month {month || "…"} · leave blank to skip a category
         </p>
       </div>
+
+      <div>
+        <p className="mb-2 text-sm text-stone-600">Need another category?</p>
+        <CategoryPicker value="" onChange={() => refreshCategories()} />
+      </div>
+
       <div className="space-y-2">
-        {CATEGORIES.map((c) => (
+        {categories.map((c) => (
           <div key={c.value} className="flex items-center gap-3">
-            <label className="w-28 text-sm text-stone-700">{c.label}</label>
+            <label className="w-28 shrink-0 text-sm text-stone-700">{c.label}</label>
             <Input
               type="number"
               min="0"
               step="1"
-              value={amounts[c.value]}
+              value={amounts[c.value] ?? ""}
               onChange={(e) =>
                 setAmounts((prev) => ({ ...prev, [c.value]: e.target.value }))
               }
