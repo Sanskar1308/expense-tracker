@@ -32,6 +32,7 @@ export default function DashboardPage() {
     }
   }
 
+  // Only block first paint — week/month switches reuse cache / placeholder
   if (isPending && !summary) {
     return (
       <p className="text-stone-600 dark:text-stone-400">Loading dashboard…</p>

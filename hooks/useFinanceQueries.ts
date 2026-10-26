@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -48,6 +49,11 @@ export function useSummary(compare: "week" | "month" = "month") {
     queryKey: queryKeys.summary(compare),
     queryFn: () =>
       apiGet<SummaryResponse>(`/api/summary?compare=${compare}`),
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    placeholderData: keepPreviousData,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }
 
