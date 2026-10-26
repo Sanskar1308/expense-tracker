@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarClock, LayoutDashboard, List, Menu, PlusCircle } from "lucide-react";
 import { cn } from "../lib/utils";
+import { ThemeCycleButton } from "./ThemeToggle";
 
 const links = [
   { href: "/", label: "Home", icon: LayoutDashboard },
@@ -81,6 +82,10 @@ export function SideNav() {
           );
         })}
       </nav>
+      <div className="mt-4 border-t border-stone-200 px-1 pt-4 dark:border-stone-700">
+        <p className="mb-2 px-2 text-xs text-stone-500 dark:text-stone-400">Theme</p>
+        <ThemeCycleButton className="w-full" />
+      </div>
     </aside>
   );
 }

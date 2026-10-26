@@ -10,6 +10,8 @@ const options: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
   { value: "system", label: "System", icon: Monitor },
 ];
 
+const cycle: ThemeMode[] = ["light", "dark", "system"];
+
 export default function ThemeToggle() {
   const { mode, setMode } = useTheme();
 
@@ -28,5 +30,26 @@ export default function ThemeToggle() {
         </Button>
       ))}
     </div>
+  );
+}
+
+/** Compact control for nav / header — cycles Light → Dark → System */
+export function ThemeCycleButton({ className }: { className?: string }) {
+  const { mode, resolved, setMode } = useTheme();
+  const Icon = mode === "system" ? Monitor : resolved === "dark" ? Moon : Sun;
+  const next = cycle[(cycle.indexOf(mode) + 1) % cycle.length];
+
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="outline"
+      className={className}
+      aria-label={`Theme: ${mode}. Click for ${next}`}
+      title={`Theme: ${mode} (click for ${next})`}
+      onClick={() => setMode(next)}
+    >
+      <Icon className="h-4 w-4" />
+    </Button>
   );
 }

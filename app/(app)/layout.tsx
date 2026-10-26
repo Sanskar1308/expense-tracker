@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import BottomNav, { SideNav } from "../../components/BottomNav";
+import { ThemeCycleButton } from "../../components/ThemeToggle";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
@@ -17,7 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-stone-600 dark:text-stone-400 ">
+      <div className="flex min-h-[50vh] items-center justify-center text-stone-600 dark:text-stone-400">
         Loading…
       </div>
     );
@@ -28,7 +29,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-7xl">
       <SideNav />
-      <div className="min-w-0 flex-1 px-4 pb-24 pt-4 md:px-8 md:pb-8 md:pt-8">
+      <div className="relative min-w-0 flex-1 px-4 pb-24 pt-4 md:px-8 md:pb-8 md:pt-8">
+        <ThemeCycleButton className="absolute right-4 top-3 z-30 md:hidden" />
         {children}
       </div>
       <BottomNav />
