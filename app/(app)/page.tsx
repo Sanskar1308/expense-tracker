@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { Progress } from "../../components/ui/progress";
 import { Button } from "../../components/ui/button";
 import TransactionRow from "../../components/TransactionRow";
+import DashboardCharts from "../../components/dashboard/DashboardCharts";
 import type { SummaryResponse } from "../../lib/types";
 import { formatRupee } from "../../lib/utils";
+import { categoryLabel } from "../../lib/analytics";
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
@@ -130,7 +132,7 @@ export default function DashboardPage() {
               return (
                 <div key={b.category} className="space-y-1">
                   <div className="flex justify-between text-sm">
-                    <span>{b.category}</span>
+                    <span>{categoryLabel(b.category)}</span>
                     <span>
                       {formatRupee(b.spent)} / {formatRupee(b.limit)}
                     </span>
@@ -142,6 +144,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {summary.charts && <DashboardCharts charts={summary.charts} />}
 
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">

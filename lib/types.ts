@@ -21,6 +21,20 @@ export type Expense = {
   card?: CreditCard | null;
 };
 
+export type SummaryCharts = {
+  dailySpend: { date: string; label: string; amount: number }[];
+  byCategory: { category: string; name: string; amount: number }[];
+  byMethod: { method: string; key: string; amount: number }[];
+  weekdayHeatmap: {
+    weekdays: string[];
+    weeks: {
+      weekLabel: string;
+      days: { date: string; weekday: string; amount: number }[];
+    }[];
+    max: number;
+  };
+};
+
 export type SummaryResponse = {
   spentToday: number;
   mainBalance: number;
@@ -38,6 +52,7 @@ export type SummaryResponse = {
   }[];
   budgets: { category: string; limit: number; spent: number }[];
   recent: Expense[];
+  charts: SummaryCharts;
 };
 
 export const COMMON_TITLES: Record<string, string> = {

@@ -9,6 +9,13 @@ import {
   startOfDay,
   startOfMonth,
 } from "../../../lib/money";
+import {
+  buildCategorySpend,
+  buildDailySpend,
+  buildMethodSpend,
+  buildWeekdayHeatmap,
+  type DebitRow,
+} from "../../../lib/analytics";
 
 export async function GET(req: Request) {
   const user = await requireUser();
@@ -23,7 +30,10 @@ export async function GET(req: Request) {
   const todayStart = startOfDay();
   const todayEnd = endOfDay();
 
-  const [allRows, monthRows, todayDebits, cards, budgets, recent] =
+  const heatmapStart = startOfDay();
+  heatmapStart.setDate(heatmapStart.getDate() - 28);
+
+  const [allRows, monthRows, todayDebits, cards, budgets, recent, last30Debits, heatmapDebits] =
     await Promise.all([
       prisma.expense.findMany({
         where: { userId: user.id },
@@ -62,6 +72,39 @@ export async function GET(req: Request) {
         orderBy: { createdAt: "desc" },
         take: 5,
       }),
+      prisma.expense.findMany({
+        where: {
+          userId: user.id,
+          type: "DEBIT",
+          createdAt: {
+            gte: (() => {
+              const d = startOfDay();
+              d.setDate(d.getDate() - 29);
+              return d;
+            })(),
+            lte: todayEnd,
+          },
+        },
+        select: {
+          amount: true,
+          paymentMethod: true,
+          category: true,
+          createdAt: true,
+        },
+      }),
+      prisma.expense.findMany({
+        where: {
+          userId: user.id,
+          type: "DEBIT",
+          createdAt: { gte: heatmapStart, lte: todayEnd },
+        },
+        select: {
+          amount: true,
+          paymentMethod: true,
+          category: true,
+          createdAt: true,
+        },
+      }),
     ]);
 
   const mainBalance = computeMainBalance(allRows);
@@ -91,6 +134,29 @@ export async function GET(req: Request) {
 
   const spentToday = todayDebits.reduce((sum, r) => sum + r.amount, 0);
 
+  const monthDebits: DebitRow[] = monthRows
+    .filter((r) => r.type === "DEBIT")
+    .map((r) => ({
+      amount: r.amount,
+      paymentMethod: r.paymentMethod,
+      category: r.category,
+      createdAt: r.createdAt,
+    }));
+
+  const dailyRows: DebitRow[] = last30Debits.map((r) => ({
+    amount: r.amount,
+    paymentMethod: r.paymentMethod,
+    category: r.category,
+    createdAt: r.createdAt,
+  }));
+
+  const heatmapRows: DebitRow[] = heatmapDebits.map((r) => ({
+    amount: r.amount,
+    paymentMethod: r.paymentMethod,
+    category: r.category,
+    createdAt: r.createdAt,
+  }));
+
   return NextResponse.json({
     spentToday,
     mainBalance,
@@ -114,5 +180,11 @@ export async function GET(req: Request) {
         spent: spentByCategory[b.category] ?? 0,
       })),
     recent,
+    charts: {
+      dailySpend: buildDailySpend(dailyRows, 30),
+      byCategory: buildCategorySpend(monthDebits),
+      byMethod: buildMethodSpend(monthDebits),
+      weekdayHeatmap: buildWeekdayHeatmap(heatmapRows, 4),
+    },
   });
 }
