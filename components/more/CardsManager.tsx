@@ -1,40 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import type { CreditCard } from "../../lib/types";
+import { apiSend } from "../../lib/api-client";
+import { queryKeys } from "../../lib/query-keys";
+import { useCards, useInvalidateMoney } from "../../hooks/useFinanceQueries";
 
 export default function CardsManager() {
-  const [cards, setCards] = useState<CreditCard[]>([]);
+  const { data: cards = [] } = useCards();
+  const qc = useQueryClient();
+  const invalidateMoney = useInvalidateMoney();
   const [name, setName] = useState("");
   const [last4, setLast4] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function load() {
-    const res = await fetch("/api/cards");
-    if (res.ok) setCards(await res.json());
+  async function refreshCards() {
+    await qc.invalidateQueries({ queryKey: queryKeys.cards });
+    await invalidateMoney();
   }
-
-  useEffect(() => {
-    load();
-  }, []);
 
   async function addCard(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/cards", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, last4: last4 || null }),
-      });
-      if (res.ok) {
-        setName("");
-        setLast4("");
-        load();
-      }
+      await apiSend("/api/cards", "POST", { name, last4: last4 || null });
+      setName("");
+      setLast4("");
+      await refreshCards();
     } finally {
       setSaving(false);
     }
@@ -43,21 +39,15 @@ export default function CardsManager() {
   async function rename(card: CreditCard) {
     const next = prompt("Card name", card.name);
     if (!next?.trim()) return;
-    await fetch(`/api/cards/${card.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: next.trim() }),
-    });
-    load();
+    await apiSend(`/api/cards/${card.id}`, "PATCH", { name: next.trim() });
+    await refreshCards();
   }
 
   async function toggleActive(card: CreditCard) {
-    await fetch(`/api/cards/${card.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isActive: !card.isActive }),
+    await apiSend(`/api/cards/${card.id}`, "PATCH", {
+      isActive: !card.isActive,
     });
-    load();
+    await refreshCards();
   }
 
   async function editBilling(card: CreditCard) {
@@ -71,20 +61,18 @@ export default function CardsManager() {
       card.dueDay != null ? String(card.dueDay) : "15"
     );
     if (due == null) return;
-    await fetch(`/api/cards/${card.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        statementDay: parseInt(statement, 10),
-        dueDay: parseInt(due, 10),
-      }),
+    await apiSend(`/api/cards/${card.id}`, "PATCH", {
+      statementDay: parseInt(statement, 10),
+      dueDay: parseInt(due, 10),
     });
-    load();
+    await refreshCards();
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 dark:border-stone-700 dark:bg-stone-900/90 p-4">
-      <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100 ">Credit cards</h2>
+    <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 p-4 dark:border-stone-700 dark:bg-stone-900/90">
+      <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">
+        Credit cards
+      </h2>
       <form onSubmit={addCard} className="space-y-2">
         <div>
           <Label htmlFor="card-name">Name</Label>
@@ -113,18 +101,18 @@ export default function CardsManager() {
         </Button>
       </form>
 
-      <ul className="divide-y divide-stone-100">
+      <ul className="divide-y divide-stone-100 dark:divide-stone-800">
         {cards.map((c) => (
           <li
             key={c.id}
             className="flex items-center justify-between gap-2 py-3 text-sm"
           >
             <div>
-              <p className="font-medium text-stone-900 dark:text-stone-100 ">
+              <p className="font-medium text-stone-900 dark:text-stone-100">
                 {c.name}
                 {c.last4 ? ` ·${c.last4}` : ""}
               </p>
-              <p className="text-xs text-stone-500 dark:text-stone-400 ">
+              <p className="text-xs text-stone-500 dark:text-stone-400">
                 {c.isActive ? "Active" : "Inactive"}
                 {c.statementDay != null && c.dueDay != null
                   ? ` · stmt ${c.statementDay} · due ${c.dueDay}`
@@ -132,10 +120,20 @@ export default function CardsManager() {
               </p>
             </div>
             <div className="flex flex-wrap justify-end gap-1">
-              <Button type="button" size="sm" variant="outline" onClick={() => editBilling(c)}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => editBilling(c)}
+              >
                 Billing
               </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => rename(c)}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => rename(c)}
+              >
                 Rename
               </Button>
               <Button
@@ -150,7 +148,9 @@ export default function CardsManager() {
           </li>
         ))}
         {cards.length === 0 && (
-          <li className="py-4 text-sm text-stone-500 dark:text-stone-400 ">No cards yet.</li>
+          <li className="py-4 text-sm text-stone-500 dark:text-stone-400">
+            No cards yet.
+          </li>
         )}
       </ul>
     </section>

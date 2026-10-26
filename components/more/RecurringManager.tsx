@@ -1,30 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import CategoryPicker from "../CategoryPicker";
-import type { CreditCard, PaymentMethod } from "../../lib/types";
+import type { PaymentMethod } from "../../lib/types";
 import { formatRupee } from "../../lib/utils";
-
-type Rule = {
-  id: string;
-  title: string;
-  amount: number;
-  category: string;
-  paymentMethod: PaymentMethod | null;
-  cardId: string | null;
-  payee: string | null;
-  dayOfMonth: number;
-  totalMonths: number | null;
-  isActive: boolean;
-  paidCount: number;
-};
+import { apiSend } from "../../lib/api-client";
+import { queryKeys } from "../../lib/query-keys";
+import {
+  useCards,
+  useInvalidateMoney,
+  useRecurring,
+} from "../../hooks/useFinanceQueries";
 
 export default function RecurringManager() {
-  const [rules, setRules] = useState<Rule[]>([]);
-  const [cards, setCards] = useState<CreditCard[]>([]);
+  const { data: rules = [] } = useRecurring();
+  const { data: allCards = [] } = useCards();
+  const cards = allCards.filter((c) => c.isActive);
+  const qc = useQueryClient();
+  const invalidateMoney = useInvalidateMoney();
+
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("OTHER");
@@ -36,67 +34,53 @@ export default function RecurringManager() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  async function load() {
-    const [r, c] = await Promise.all([
-      fetch("/api/recurring").then((x) => x.json()),
-      fetch("/api/cards").then((x) => x.json()),
+  async function refresh() {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: queryKeys.recurring }),
+      qc.invalidateQueries({ queryKey: queryKeys.pendings }),
+      invalidateMoney(),
     ]);
-    if (Array.isArray(r)) setRules(r);
-    if (Array.isArray(c)) setCards(c.filter((x: CreditCard) => x.isActive));
   }
-
-  useEffect(() => {
-    load();
-  }, []);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/api/recurring", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          amount: parseFloat(amount),
-          category,
-          type: "DEBIT",
-          paymentMethod: method,
-          cardId: method === "CC" ? cardId : null,
-          payee: payee || null,
-          dayOfMonth: parseInt(dayOfMonth, 10),
-          totalMonths: totalMonths ? parseInt(totalMonths, 10) : null,
-        }),
+      await apiSend("/api/recurring", "POST", {
+        title,
+        amount: parseFloat(amount),
+        category,
+        type: "DEBIT",
+        paymentMethod: method,
+        cardId: method === "CC" ? cardId : null,
+        payee: payee || null,
+        dayOfMonth: parseInt(dayOfMonth, 10),
+        totalMonths: totalMonths ? parseInt(totalMonths, 10) : null,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || "Failed");
-        return;
-      }
       setTitle("");
       setAmount("");
       setPayee("");
       setTotalMonths("");
-      load();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
     } finally {
       setSaving(false);
     }
   }
 
-  async function toggle(rule: Rule) {
-    await fetch(`/api/recurring/${rule.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isActive: !rule.isActive }),
+  async function toggle(rule: { id: string; isActive: boolean }) {
+    await apiSend(`/api/recurring/${rule.id}`, "PATCH", {
+      isActive: !rule.isActive,
     });
-    load();
+    await refresh();
   }
 
-  async function remove(rule: Rule) {
+  async function remove(rule: { id: string; title: string }) {
     if (!confirm(`Delete rule “${rule.title}”?`)) return;
-    await fetch(`/api/recurring/${rule.id}`, { method: "DELETE" });
-    load();
+    await apiSend(`/api/recurring/${rule.id}`, "DELETE");
+    await refresh();
   }
 
   return (

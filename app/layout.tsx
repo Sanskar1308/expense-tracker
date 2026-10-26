@@ -3,6 +3,7 @@ import { DM_Sans, Fraunces } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../components/AuthProvider";
 import { ThemeProvider } from "../components/ThemeProvider";
+import QueryProvider from "../components/QueryProvider";
 import PwaRegister from "../components/PwaRegister";
 
 const sans = DM_Sans({
@@ -54,10 +55,12 @@ export default function RootLayout({
       </head>
       <body className={`${sans.variable} ${display.variable} antialiased`}>
         <ThemeProvider>
-          <AuthProvider>
-            {children}
-            <PwaRegister />
-          </AuthProvider>
+          <QueryProvider>
+            <AuthProvider>
+              {children}
+              <PwaRegister />
+            </AuthProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

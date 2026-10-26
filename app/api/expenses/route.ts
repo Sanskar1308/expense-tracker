@@ -44,18 +44,27 @@ export async function GET(req: Request) {
 
   const expenses = await prisma.expense.findMany({
     where,
-    include: {
-      card: true,
-      pendingPayment: { select: { id: true } },
-    },
+    include: { card: true },
     orderBy: { createdAt: "desc" },
   });
 
+  const ids = expenses.map((e) => e.id);
+  const linked =
+    ids.length === 0
+      ? []
+      : await prisma.pendingPayment.findMany({
+          where: { expenseId: { in: ids } },
+          select: { id: true, expenseId: true },
+        });
+  const pendingByExpense = new Map(
+    linked.map((p) => [p.expenseId!, p.id])
+  );
+
   return NextResponse.json(
-    expenses.map(({ pendingPayment, ...e }) => ({
+    expenses.map((e) => ({
       ...e,
-      fromPending: !!pendingPayment,
-      pendingId: pendingPayment?.id ?? null,
+      fromPending: pendingByExpense.has(e.id),
+      pendingId: pendingByExpense.get(e.id) ?? null,
     }))
   );
 }

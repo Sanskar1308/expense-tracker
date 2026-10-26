@@ -1,45 +1,52 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Progress } from "../../components/ui/progress";
 import { Button } from "../../components/ui/button";
 import TransactionRow from "../../components/TransactionRow";
 import DashboardCharts from "../../components/dashboard/DashboardCharts";
-import type { SummaryResponse } from "../../lib/types";
 import { formatRupee } from "../../lib/utils";
 import { categoryLabel } from "../../lib/analytics";
+import {
+  useRepeatExpense,
+  useSummary,
+} from "../../hooks/useFinanceQueries";
 
 export default function DashboardPage() {
-  const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [toast, setToast] = useState("");
   const [compareMode, setCompareMode] = useState<"week" | "month">("month");
-
-  const load = useCallback(async () => {
-    const res = await fetch(`/api/summary?compare=${compareMode}`);
-    if (res.ok) setSummary(await res.json());
-  }, [compareMode]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data: summary, isPending, isError, error, refetch } =
+    useSummary(compareMode);
+  const repeatMutation = useRepeatExpense();
 
   async function repeat(id: string) {
-    const res = await fetch("/api/expenses/repeat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    if (res.ok) {
+    try {
+      await repeatMutation.mutateAsync(id);
       setToast("Added for today");
-      load();
+      setTimeout(() => setToast(""), 2000);
+    } catch {
+      setToast("Could not repeat");
       setTimeout(() => setToast(""), 2000);
     }
   }
 
-  if (!summary) {
-    return <p className="text-stone-600 dark:text-stone-400 ">Loading dashboard…</p>;
+  if (isPending && !summary) {
+    return (
+      <p className="text-stone-600 dark:text-stone-400">Loading dashboard…</p>
+    );
+  }
+
+  if (isError || !summary) {
+    return (
+      <div className="space-y-3 text-stone-600 dark:text-stone-400">
+        <p>{error?.message || "Could not load dashboard"}</p>
+        <Button type="button" size="sm" variant="outline" onClick={() => refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
   }
 
   const daysLeftGoal = summary.savings

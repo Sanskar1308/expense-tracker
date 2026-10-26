@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import type { CategoryOption } from "../lib/categories";
 import { DEFAULT_CATEGORIES } from "../lib/categories";
 import { cn } from "../lib/utils";
+import { apiSend } from "../lib/api-client";
+import { queryKeys } from "../lib/query-keys";
+import { useCategories } from "../hooks/useFinanceQueries";
 
 export default function CategoryPicker({
   value,
@@ -17,24 +20,15 @@ export default function CategoryPicker({
   onChange: (value: string) => void;
   allowAdd?: boolean;
 }) {
-  const [categories, setCategories] = useState<CategoryOption[]>(
-    DEFAULT_CATEGORIES.map((c) => ({ ...c, custom: false }))
-  );
+  const { data: categories = DEFAULT_CATEGORIES.map((c) => ({
+    ...c,
+    custom: false as boolean | undefined,
+  })) } = useCategories();
+  const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/categories");
-    if (!res.ok) return;
-    const data = await res.json();
-    if (Array.isArray(data.categories)) setCategories(data.categories);
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   async function addCategory() {
     const name = newName.trim();
@@ -45,21 +39,15 @@ export default function CategoryPicker({
     setError("");
     setSaving(true);
     try {
-      const res = await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+      const data = await apiSend<{ name: string }>("/api/categories", "POST", {
+        name,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || "Could not add");
-        return;
-      }
-      const created = data.name as string;
       setNewName("");
       setAdding(false);
-      await load();
-      onChange(created);
+      await qc.invalidateQueries({ queryKey: queryKeys.categories });
+      onChange(data.name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add");
     } finally {
       setSaving(false);
     }
@@ -103,15 +91,15 @@ export default function CategoryPicker({
             autoFocus
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
+            placeholder="New category name"
+            className="max-w-[200px]"
+            maxLength={40}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
                 void addCategory();
               }
             }}
-            placeholder="New category name"
-            className="max-w-[200px]"
-            maxLength={40}
           />
           <Button
             type="button"

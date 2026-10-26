@@ -8,11 +8,14 @@ import { Label } from "../ui/label";
 import CategoryPicker from "../CategoryPicker";
 import {
   COMMON_TITLES,
-  type CreditCard,
   type PaymentMethod,
   type TransactionType,
 } from "../../lib/types";
 import { cn } from "../../lib/utils";
+import {
+  useCards,
+  useCreateExpense,
+} from "../../hooks/useFinanceQueries";
 
 const QUICK_AMOUNTS = [20, 50, 100, 200, 500];
 const STORAGE_METHOD = "et_last_payment_method";
@@ -30,9 +33,9 @@ export default function AddTransactionForm({
   const [category, setCategory] = useState("OTHER");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [cardId, setCardId] = useState("");
-  const [cards, setCards] = useState<CreditCard[]>([]);
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const { data: cards = [] } = useCards();
+  const createExpense = useCreateExpense();
 
   useEffect(() => {
     amountRef.current?.focus();
@@ -42,23 +45,13 @@ export default function AddTransactionForm({
       setPaymentMethod(savedMethod);
     }
     if (savedCard) setCardId(savedCard);
-
-    fetch("/api/cards")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setCards(data.filter((c: CreditCard) => c.isActive));
-        }
-      })
-      .catch(() => undefined);
   }, []);
 
-  const activeCards = cards;
+  const activeCards = cards.filter((c) => c.isActive);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    setSaving(true);
     try {
       const payload = {
         title,
@@ -71,20 +64,10 @@ export default function AddTransactionForm({
 
       if (type === "DEBIT" && paymentMethod === "CC" && !cardId) {
         setMessage("Add a card in More, or pick one.");
-        setSaving(false);
         return;
       }
 
-      const res = await fetch("/api/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setMessage(err.error || "Failed to save");
-        return;
-      }
+      await createExpense.mutateAsync(payload);
 
       if (type === "DEBIT") {
         localStorage.setItem(STORAGE_METHOD, paymentMethod);
@@ -98,10 +81,8 @@ export default function AddTransactionForm({
       setMessage("Saved");
       onSaved?.();
       amountRef.current?.focus();
-    } catch {
-      setMessage("Failed to save");
-    } finally {
-      setSaving(false);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to save");
     }
   }
 
@@ -248,11 +229,11 @@ export default function AddTransactionForm({
         size="lg"
         className="w-full"
         disabled={
-          saving ||
+          createExpense.isPending ||
           (type === "DEBIT" && paymentMethod === "CC" && activeCards.length === 0)
         }
       >
-        {saving ? "Saving…" : "Save"}
+        {createExpense.isPending ? "Saving…" : "Save"}
       </Button>
     </form>
   );

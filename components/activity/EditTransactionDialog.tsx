@@ -12,11 +12,14 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import CategoryPicker from "../CategoryPicker";
 import {
-  type CreditCard,
   type Expense,
   type PaymentMethod,
   type TransactionType,
 } from "../../lib/types";
+import {
+  useCards,
+  useUpdateExpense,
+} from "../../hooks/useFinanceQueries";
 
 export default function EditTransactionDialog({
   expense,
@@ -29,14 +32,14 @@ export default function EditTransactionDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const { data: cards = [] } = useCards();
+  const updateExpense = useUpdateExpense();
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<TransactionType>("DEBIT");
   const [category, setCategory] = useState("OTHER");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [cardId, setCardId] = useState("");
-  const [cards, setCards] = useState<CreditCard[]>([]);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -50,42 +53,25 @@ export default function EditTransactionDialog({
     setError("");
   }, [expense]);
 
-  useEffect(() => {
-    if (!open) return;
-    fetch("/api/cards")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setCards(data);
-      })
-      .catch(() => undefined);
-  }, [open]);
-
   async function save() {
     if (!expense) return;
-    setSaving(true);
     setError("");
     try {
-      const res = await fetch(`/api/expenses/${expense.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await updateExpense.mutateAsync({
+        id: expense.id,
+        body: {
           title,
           amount: parseFloat(amount),
           category,
           type,
           paymentMethod: type === "CREDIT" ? null : paymentMethod,
           cardId: type === "DEBIT" && paymentMethod === "CC" ? cardId : null,
-        }),
+        },
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setError(err.error || "Update failed");
-        return;
-      }
       onOpenChange(false);
       onSaved();
-    } finally {
-      setSaving(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update failed");
     }
   }
 
@@ -98,7 +84,11 @@ export default function EditTransactionDialog({
         <div className="space-y-3">
           <div>
             <Label>Title</Label>
-            <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input
+              className="mt-1"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
           </div>
           <div>
             <Label>Amount</Label>
@@ -163,8 +153,12 @@ export default function EditTransactionDialog({
             </div>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button className="w-full" onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save changes"}
+          <Button
+            className="w-full"
+            onClick={save}
+            disabled={updateExpense.isPending}
+          >
+            {updateExpense.isPending ? "Saving…" : "Save changes"}
           </Button>
         </div>
       </DialogContent>
