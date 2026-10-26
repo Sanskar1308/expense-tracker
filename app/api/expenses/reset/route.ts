@@ -1,26 +1,15 @@
-// app/api/expenses/reset/route.ts
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { PrismaClient, CategoryType, Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-
-const prisma = new PrismaClient();
+import { CategoryType, Prisma } from "@prisma/client";
+import { prisma } from "../../../../lib/prisma";
+import { requireUser } from "../../../../lib/session-user";
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const user = await requireUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { startDate, endDate, category } = await req.json();
-
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-  });
-
-  if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
 
   const where: Prisma.ExpenseWhereInput = { userId: user.id };
 
