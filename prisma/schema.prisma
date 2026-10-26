@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,14 +11,16 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(cuid())
-  name           String?
-  email          String? @unique
-  emailVerified  DateTime?
-  image          String?
-  accounts       Account[]
-  sessions       Session[]
-  expenses       Expense[]
+  id            String       @id @default(cuid())
+  name          String?
+  email         String?      @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  expenses      Expense[]
+  creditCards   CreditCard[]
+  budgets       Budget[]
 }
 
 enum CategoryType {
@@ -32,30 +31,66 @@ enum CategoryType {
   OTHER
 }
 
-model Expense {
-  id         String        @id @default(cuid())
-  title      String
-  amount     Float
-  createdAt  DateTime      @default(now())
-  user       User          @relation(fields: [userId], references: [id])
-  userId     String
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
 
-  category   CategoryType  // enum instead of relation
+enum PaymentMethod {
+  CASH
+  UPI
+  CC
+}
+
+model CreditCard {
+  id        String    @id @default(cuid())
+  name      String
+  last4     String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses  Expense[]
+}
+
+model Budget {
+  id       String       @id @default(cuid())
+  amount   Float
+  month    String
+  category CategoryType
+  userId   String
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, month])
+}
+
+model Expense {
+  id            String           @id @default(cuid())
+  title         String
+  amount        Float
+  createdAt     DateTime         @default(now())
+  user          User             @relation(fields: [userId], references: [id])
+  userId        String
+  category      CategoryType
+  type          TransactionType  @default(DEBIT)
+  paymentMethod PaymentMethod?
+  cardId        String?
+  card          CreditCard?      @relation(fields: [cardId], references: [id])
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?   // <-- Needed
-  access_token       String?   // <-- Needed
-  expires_at         Int?      // <-- This is the one causing the error
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -78,4 +113,3 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
-
