@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, List, Menu, PlusCircle } from "lucide-react";
+import { CalendarClock, LayoutDashboard, List, Menu, PlusCircle } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const links = [
   { href: "/", label: "Home", icon: LayoutDashboard },
   { href: "/add", label: "Add", icon: PlusCircle },
+  { href: "/dues", label: "Dues", icon: CalendarClock },
   { href: "/activity", label: "Activity", icon: List },
   { href: "/more", label: "More", icon: Menu },
 ];

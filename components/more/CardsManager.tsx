@@ -60,6 +60,28 @@ export default function CardsManager() {
     load();
   }
 
+  async function editBilling(card: CreditCard) {
+    const statement = prompt(
+      "Statement day (1–28)",
+      card.statementDay != null ? String(card.statementDay) : "1"
+    );
+    if (statement == null) return;
+    const due = prompt(
+      "Due day (1–28)",
+      card.dueDay != null ? String(card.dueDay) : "15"
+    );
+    if (due == null) return;
+    await fetch(`/api/cards/${card.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        statementDay: parseInt(statement, 10),
+        dueDay: parseInt(due, 10),
+      }),
+    });
+    load();
+  }
+
   return (
     <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 p-4">
       <h2 className="text-lg font-semibold text-stone-900">Credit cards</h2>
@@ -104,9 +126,15 @@ export default function CardsManager() {
               </p>
               <p className="text-xs text-stone-500">
                 {c.isActive ? "Active" : "Inactive"}
+                {c.statementDay != null && c.dueDay != null
+                  ? ` · stmt ${c.statementDay} · due ${c.dueDay}`
+                  : " · set billing days"}
               </p>
             </div>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap justify-end gap-1">
+              <Button type="button" size="sm" variant="outline" onClick={() => editBilling(c)}>
+                Billing
+              </Button>
               <Button type="button" size="sm" variant="outline" onClick={() => rename(c)}>
                 Rename
               </Button>

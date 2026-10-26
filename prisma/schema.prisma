@@ -11,9 +11,9 @@ datasource db {
 }
 
 model User {
-  id            String       @id @default(cuid())
+  id            String           @id @default(cuid())
   name          String?
-  email         String?      @unique
+  email         String?          @unique
   emailVerified DateTime?
   image         String?
   accounts      Account[]
@@ -22,6 +22,9 @@ model User {
   creditCards   CreditCard[]
   budgets       Budget[]
   categories    Category[]
+  recurringRules RecurringRule[]
+  pendingPayments PendingPayment[]
+  savingsGoal   SavingsGoal?
 }
 
 enum TransactionType {
@@ -33,6 +36,16 @@ enum PaymentMethod {
   CASH
   UPI
   CC
+}
+
+enum RecurringCadence {
+  MONTHLY
+}
+
+enum PendingStatus {
+  PENDING
+  PAID
+  SKIPPED
 }
 
 model Category {
@@ -47,14 +60,16 @@ model Category {
 }
 
 model CreditCard {
-  id        String    @id @default(cuid())
-  name      String
-  last4     String?
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expenses  Expense[]
+  id           String    @id @default(cuid())
+  name         String
+  last4        String?
+  isActive     Boolean   @default(true)
+  statementDay Int?
+  dueDay       Int?
+  createdAt    DateTime  @default(now())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses     Expense[]
 }
 
 model Budget {
@@ -80,6 +95,60 @@ model Expense {
   paymentMethod PaymentMethod?
   cardId        String?
   card          CreditCard?     @relation(fields: [cardId], references: [id])
+  pendingPayment PendingPayment?
+}
+
+model RecurringRule {
+  id            String           @id @default(cuid())
+  title         String
+  amount        Float
+  category      String
+  type          TransactionType  @default(DEBIT)
+  paymentMethod PaymentMethod?
+  cardId        String?
+  payee         String?
+  cadence       RecurringCadence @default(MONTHLY)
+  dayOfMonth    Int
+  totalMonths   Int?
+  isActive      Boolean          @default(true)
+  startDate     DateTime         @default(now())
+  createdAt     DateTime         @default(now())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pendings      PendingPayment[]
+}
+
+model PendingPayment {
+  id            String           @id @default(cuid())
+  title         String
+  amount        Float
+  category      String
+  type          TransactionType  @default(DEBIT)
+  paymentMethod PaymentMethod?
+  cardId        String?
+  payee         String?
+  dueDate       DateTime
+  status        PendingStatus    @default(PENDING)
+  expenseId     String?          @unique
+  expense       Expense?         @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  ruleId        String
+  rule          RecurringRule    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime         @default(now())
+
+  @@unique([ruleId, dueDate])
+}
+
+model SavingsGoal {
+  id           String   @id @default(cuid())
+  title        String?
+  targetAmount Float
+  deadline     DateTime
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
 }
 
 model Account {

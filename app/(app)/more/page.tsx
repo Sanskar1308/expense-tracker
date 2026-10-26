@@ -3,6 +3,8 @@
 import { signOut } from "next-auth/react";
 import CardsManager from "../../../components/more/CardsManager";
 import BudgetsManager from "../../../components/more/BudgetsManager";
+import RecurringManager from "../../../components/more/RecurringManager";
+import SavingsGoalForm from "../../../components/more/SavingsGoalForm";
 import { Button } from "../../../components/ui/button";
 
 export default function MorePage() {
@@ -12,10 +14,14 @@ export default function MorePage() {
         <h1 className="text-2xl font-semibold tracking-tight text-stone-900 md:text-3xl">
           More
         </h1>
-        <p className="text-sm text-stone-600">Cards, budgets, and account.</p>
+        <p className="text-sm text-stone-600">
+          Cards, recurring, budgets, savings, account.
+        </p>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
+        <RecurringManager />
+        <SavingsGoalForm />
         <CardsManager />
         <BudgetsManager />
       </div>

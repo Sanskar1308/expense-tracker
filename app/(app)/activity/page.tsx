@@ -6,6 +6,7 @@ import { Button } from "../../../components/ui/button";
 import { Label } from "../../../components/ui/label";
 import TransactionRow from "../../../components/TransactionRow";
 import EditTransactionDialog from "../../../components/activity/EditTransactionDialog";
+import UndoToast from "../../../components/UndoToast";
 import type { CategoryOption } from "../../../lib/categories";
 import { DEFAULT_CATEGORIES } from "../../../lib/categories";
 import {
@@ -23,6 +24,7 @@ export default function ActivityPage() {
   const [range, setRange] = useState<"all" | "week" | "month">("month");
   const [editing, setEditing] = useState<Expense | null>(null);
   const [toast, setToast] = useState("");
+  const [undoExpense, setUndoExpense] = useState<Expense | null>(null);
   const [categories, setCategories] = useState<CategoryOption[]>(
     DEFAULT_CATEGORIES.map((c) => ({ ...c, custom: false }))
   );
@@ -80,8 +82,34 @@ export default function ActivityPage() {
 
   async function remove(id: string) {
     if (!confirm("Delete this transaction?")) return;
+    const snapshot = expenses.find((e) => e.id === id) || null;
     const res = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
-    if (res.ok) load();
+    if (res.ok) {
+      if (snapshot) {
+        setUndoExpense(snapshot);
+        setTimeout(
+          () => setUndoExpense((u) => (u?.id === snapshot.id ? null : u)),
+          8000
+        );
+      }
+      load();
+    }
+  }
+
+  async function restoreExpense(e: Expense) {
+    await fetch("/api/expenses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: e.title,
+        amount: e.amount,
+        category: e.category,
+        type: e.type,
+        paymentMethod: e.paymentMethod,
+        cardId: e.cardId,
+      }),
+    });
+    load();
   }
 
   return (
@@ -214,6 +242,14 @@ export default function ActivityPage() {
         onOpenChange={(open) => !open && setEditing(null)}
         onSaved={load}
       />
+
+      {undoExpense && (
+        <UndoToast
+          message="Transaction deleted"
+          onUndo={() => restoreExpense(undoExpense)}
+          onDismiss={() => setUndoExpense(null)}
+        />
+      )}
     </div>
   );
 }

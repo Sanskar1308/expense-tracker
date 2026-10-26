@@ -6,6 +6,8 @@ export type CreditCard = {
   name: string;
   last4: string | null;
   isActive: boolean;
+  statementDay?: number | null;
+  dueDay?: number | null;
   createdAt: string;
 };
 
@@ -53,6 +55,44 @@ export type SummaryResponse = {
   budgets: { category: string; limit: number; spent: number }[];
   recent: Expense[];
   charts: SummaryCharts;
+  duesBadge?: number;
+  upcomingDues?: {
+    id: string;
+    title: string;
+    amount: number;
+    payee: string | null;
+    dueDate: string;
+  }[];
+  cardBills?: {
+    id: string;
+    name: string;
+    last4: string | null;
+    owed: number;
+    dueDate: string;
+    daysLeft: number;
+    dueSoon: boolean;
+  }[];
+  compare?: {
+    mode: "week" | "month";
+    currentTotal: number;
+    previousTotal: number;
+    deltaPct: number;
+    movers: {
+      category: string;
+      name: string;
+      current: number;
+      previous: number;
+      change: number;
+      pct: number;
+    }[];
+  };
+  savings?: {
+    title: string | null;
+    targetAmount: number;
+    deadline: string;
+    mainBalance: number;
+    progressPct: number;
+  } | null;
 };
 
 export const COMMON_TITLES: Record<string, string> = {

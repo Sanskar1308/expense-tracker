@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { requireUser } from "../../../../lib/session-user";
+import { clampDayOfMonth } from "../../../../lib/dues";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,7 +20,13 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 
   const body = await req.json();
-  const data: { name?: string; last4?: string | null; isActive?: boolean } = {};
+  const data: {
+    name?: string;
+    last4?: string | null;
+    isActive?: boolean;
+    statementDay?: number | null;
+    dueDay?: number | null;
+  } = {};
 
   if (body.name != null) {
     const name = String(body.name).trim();
@@ -36,6 +43,18 @@ export async function PATCH(req: Request, { params }: Params) {
   }
   if (typeof body.isActive === "boolean") {
     data.isActive = body.isActive;
+  }
+  if (body.statementDay !== undefined) {
+    data.statementDay =
+      body.statementDay === null || body.statementDay === ""
+        ? null
+        : clampDayOfMonth(Number(body.statementDay));
+  }
+  if (body.dueDay !== undefined) {
+    data.dueDay =
+      body.dueDay === null || body.dueDay === ""
+        ? null
+        : clampDayOfMonth(Number(body.dueDay));
   }
 
   const updated = await prisma.creditCard.update({
