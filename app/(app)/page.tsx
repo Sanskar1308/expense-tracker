@@ -9,6 +9,7 @@ import TransactionRow from "../../components/TransactionRow";
 import DashboardCharts from "../../components/dashboard/DashboardCharts";
 import { formatRupee } from "../../lib/utils";
 import { categoryLabel } from "../../lib/analytics";
+import { formatDueDate } from "../../lib/due-dates";
 import {
   useRepeatExpense,
   useSummary,
@@ -172,12 +173,7 @@ export default function DashboardPage() {
                       {b.name}
                       {b.dueSoon ? " · due soon" : ""}
                       <span className="block text-xs text-stone-500 dark:text-stone-400 ">
-                        Due{" "}
-                        {new Date(b.dueDate).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                        })}{" "}
-                        ({b.daysLeft}d)
+                        Due {formatDueDate(b.dueDate)} ({b.daysLeft}d)
                       </span>
                     </span>
                     <span className="font-medium">{formatRupee(b.owed)}</span>

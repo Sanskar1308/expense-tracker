@@ -14,6 +14,7 @@ import {
 } from "../../../components/ui/dialog";
 import UndoToast from "../../../components/UndoToast";
 import { formatRupee } from "../../../lib/utils";
+import { calendarKey, formatDueDate } from "../../../lib/due-dates";
 import {
   usePayPending,
   usePendings,
@@ -34,10 +35,7 @@ type Pending = {
 };
 
 function toDateInputValue(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return calendarKey(d);
 }
 
 export default function DuesPage() {
@@ -129,11 +127,7 @@ export default function DuesPage() {
                     <Badge variant="default">{p.paymentMethod}</Badge>
                   )}
                   <span>
-                    Due{" "}
-                    {new Date(p.dueDate).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                    })}
+                    Due {formatDueDate(p.dueDate)}
                   </span>
                   {p.totalMonths != null && (
                     <span>

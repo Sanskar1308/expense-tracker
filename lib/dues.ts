@@ -1,87 +1,81 @@
 import { prisma } from "./prisma";
 import { endOfDay, startOfDay } from "./money";
 import { categoryLabel } from "./analytics";
+import {
+  addMonths,
+  calendarKey,
+  dateForDayInMonth,
+  dueDatesForRule,
+  lastOnOrBefore,
+  nextOnOrAfter,
+  utcNoon,
+  ymdInZone,
+} from "./due-dates";
 
-export function clampDayOfMonth(day: number): number {
-  return Math.min(28, Math.max(1, Math.floor(day)));
-}
+export {
+  clampDayOfMonth,
+  calendarKey,
+  dateForDayInMonth,
+  dueDatesForRule,
+  daysUntil,
+  formatDueDate,
+  lastOnOrBefore,
+  nextOnOrAfter,
+  utcNoon,
+  ymdInZone,
+  DUES_TZ,
+} from "./due-dates";
 
-/** Date at local midnight for year/month with day clamped to month length (max 28 for rules). */
-export function dateForDayInMonth(year: number, monthIndex: number, day: number): Date {
-  const dim = new Date(year, monthIndex + 1, 0).getDate();
-  const d = Math.min(clampDayOfMonth(day), dim);
-  return new Date(year, monthIndex, d, 0, 0, 0, 0);
-}
+/**
+ * Collapse same-rule pendings that share a calendar day (IST vs UTC host
+ * mismatch), then rewrite dueDate to UTC noon so upserts stay idempotent.
+ */
+async function normalizePendingsForRule(ruleId: string) {
+  const rows = await prisma.pendingPayment.findMany({
+    where: { ruleId },
+    orderBy: { createdAt: "asc" },
+  });
+  const groups = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const key = calendarKey(row.dueDate);
+    const list = groups.get(key) ?? [];
+    list.push(row);
+    groups.set(key, list);
+  }
 
-/** Most recent occurrence of `day` on or before `from` (local). */
-export function lastOnOrBefore(from: Date, day: number): Date {
-  const base = startOfDay(from);
-  const candidate = dateForDayInMonth(base.getFullYear(), base.getMonth(), day);
-  if (candidate <= base) return candidate;
-  const prev = new Date(base.getFullYear(), base.getMonth() - 1, 1);
-  return dateForDayInMonth(prev.getFullYear(), prev.getMonth(), day);
-}
-
-/** Next occurrence of `day` on or after `from` (local). */
-export function nextOnOrAfter(from: Date, day: number): Date {
-  const base = startOfDay(from);
-  const candidate = dateForDayInMonth(base.getFullYear(), base.getMonth(), day);
-  if (candidate >= base) return candidate;
-  const next = new Date(base.getFullYear(), base.getMonth() + 1, 1);
-  return dateForDayInMonth(next.getFullYear(), next.getMonth(), day);
-}
-
-export function addMonths(d: Date, n: number): Date {
-  return new Date(d.getFullYear(), d.getMonth() + n, d.getDate(), 0, 0, 0, 0);
-}
-
-/** Due dates to generate for a monthly rule (lookback ≤ 3 months through current). */
-export function dueDatesForRule(
-  dayOfMonth: number,
-  startDate: Date,
-  now = new Date(),
-  lookbackMonths = 3
-): Date[] {
-  const today = startOfDay(now);
-  const start = startOfDay(startDate);
-  const earliest = addMonths(today, -lookbackMonths);
-  const from = start > earliest ? start : earliest;
-
-  const dates: Date[] = [];
-  // Walk month by month from `from` month to current month
-  let cursor = new Date(from.getFullYear(), from.getMonth(), 1);
-  const endMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  while (cursor <= endMonth) {
-    const due = dateForDayInMonth(
-      cursor.getFullYear(),
-      cursor.getMonth(),
-      dayOfMonth
-    );
-    if (due >= from && due <= today) {
-      dates.push(due);
-    } else if (due > today) {
-      // also include upcoming due this month if day hasn't arrived? Spec: generate current cycle
-      // Include if due is within next 35 days and same/next cycle
+  for (const [, list] of groups) {
+    const keeper =
+      list.find((p) => p.status === "PAID" && p.expenseId) ||
+      list.find((p) => p.status === "PAID") ||
+      list[0];
+    const dropIds = list.filter((p) => p.id !== keeper.id).map((p) => p.id);
+    if (dropIds.length > 0) {
+      await prisma.pendingPayment.deleteMany({
+        where: { id: { in: dropIds } },
+      });
     }
-    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-  }
 
-  // Always include next upcoming due if not already past this month's
-  const upcoming = nextOnOrAfter(today, dayOfMonth);
-  const upcomingKey = upcoming.getTime();
-  if (!dates.some((d) => d.getTime() === upcomingKey)) {
-    // only if within ~35 days
-    const limit = addMonths(today, 1);
-    if (upcoming <= limit) dates.push(upcoming);
+    const { year, monthIndex, day } = ymdInZone(keeper.dueDate);
+    const normalized = utcNoon(year, monthIndex, day);
+    if (keeper.dueDate.getTime() !== normalized.getTime()) {
+      await prisma.pendingPayment.update({
+        where: { id: keeper.id },
+        data: { dueDate: normalized },
+      });
+    }
   }
-
-  return dates;
 }
 
 export async function ensurePendingsForUser(userId: string) {
-  const rules = await prisma.recurringRule.findMany({
-    where: { userId, isActive: true },
+  const allRules = await prisma.recurringRule.findMany({
+    where: { userId },
   });
+
+  for (const rule of allRules) {
+    await normalizePendingsForRule(rule.id);
+  }
+
+  const rules = allRules.filter((r) => r.isActive);
 
   for (const rule of rules) {
     const paidCount = await prisma.pendingPayment.count({
@@ -139,25 +133,16 @@ export function cardBillingCycle(
 ) {
   const cycleStart = lastOnOrBefore(now, statementDay);
   const dueDate = nextOnOrAfter(cycleStart, dueDay);
-  // If due date fell before cycle start somehow, push a month
   let due = dueDate;
   if (due < cycleStart) {
     due = nextOnOrAfter(addMonths(cycleStart, 0), dueDay);
     if (due < cycleStart) due = addMonths(due, 1);
   }
-  // Prefer due after statement in same cycle
   if (due < cycleStart) {
-    due = dateForDayInMonth(
-      cycleStart.getFullYear(),
-      cycleStart.getMonth(),
-      dueDay
-    );
+    const { year, monthIndex } = ymdInZone(cycleStart);
+    due = dateForDayInMonth(year, monthIndex, dueDay);
     if (due < cycleStart) {
-      due = dateForDayInMonth(
-        cycleStart.getFullYear(),
-        cycleStart.getMonth() + 1,
-        dueDay
-      );
+      due = dateForDayInMonth(year, monthIndex + 1, dueDay);
     }
   }
   return { cycleStart, dueDate: due, cycleEnd: endOfDay(now) };
@@ -238,10 +223,4 @@ export function buildPeriodCompare(
     deltaPct: Math.round(deltaPct * 10) / 10,
     movers,
   };
-}
-
-export function daysUntil(date: Date, now = new Date()): number {
-  const a = startOfDay(now).getTime();
-  const b = startOfDay(date).getTime();
-  return Math.round((b - a) / (24 * 60 * 60 * 1000));
 }
