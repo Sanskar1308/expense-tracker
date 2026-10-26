@@ -24,10 +24,40 @@ export async function POST(req: Request) {
     where.category = String(category);
   }
 
-  const deleted = await prisma.expense.deleteMany({ where });
+  const toDelete = await prisma.expense.findMany({
+    where,
+    select: { id: true },
+  });
+  const ids = toDelete.map((e) => e.id);
+
+  if (ids.length === 0) {
+    return NextResponse.json({
+      message: "Expenses deleted successfully",
+      deletedCount: 0,
+    });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const linked = await tx.pendingPayment.findMany({
+      where: { expenseId: { in: ids }, status: "PAID" },
+      select: { id: true, ruleId: true },
+    });
+    if (linked.length > 0) {
+      await tx.pendingPayment.updateMany({
+        where: { id: { in: linked.map((p) => p.id) } },
+        data: { status: "PENDING", expenseId: null },
+      });
+      const ruleIds = [...new Set(linked.map((p) => p.ruleId))];
+      await tx.recurringRule.updateMany({
+        where: { id: { in: ruleIds } },
+        data: { isActive: true },
+      });
+    }
+    await tx.expense.deleteMany({ where: { id: { in: ids } } });
+  });
 
   return NextResponse.json({
     message: "Expenses deleted successfully",
-    deletedCount: deleted.count,
+    deletedCount: ids.length,
   });
 }

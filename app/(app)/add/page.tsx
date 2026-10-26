@@ -4,10 +4,10 @@ export default function AddPage() {
   return (
     <div className="mx-auto w-full max-w-xl space-y-4 md:pt-4">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-stone-900 md:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-100 md:text-3xl">
           Add
         </h1>
-        <p className="text-sm text-stone-600">
+        <p className="text-sm text-stone-600 dark:text-stone-400 ">
           Log a credit or debit in a few taps.
         </p>
       </header>

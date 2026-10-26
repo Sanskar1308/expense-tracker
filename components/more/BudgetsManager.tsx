@@ -76,16 +76,16 @@ export default function BudgetsManager() {
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 p-4">
+    <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 dark:border-stone-700 dark:bg-stone-900/90 p-4">
       <div>
-        <h2 className="text-lg font-semibold text-stone-900">Budgets</h2>
-        <p className="text-sm text-stone-600">
+        <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100 ">Budgets</h2>
+        <p className="text-sm text-stone-600 dark:text-stone-400 ">
           Month {month || "…"} · leave blank to skip a category
         </p>
       </div>
 
       <div>
-        <p className="mb-2 text-sm text-stone-600">Need another category?</p>
+        <p className="mb-2 text-sm text-stone-600 dark:text-stone-400 ">Need another category?</p>
         <CategoryPicker value="" onChange={() => refreshCategories()} />
       </div>
 

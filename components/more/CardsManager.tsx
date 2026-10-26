@@ -83,8 +83,8 @@ export default function CardsManager() {
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 p-4">
-      <h2 className="text-lg font-semibold text-stone-900">Credit cards</h2>
+    <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 dark:border-stone-700 dark:bg-stone-900/90 p-4">
+      <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100 ">Credit cards</h2>
       <form onSubmit={addCard} className="space-y-2">
         <div>
           <Label htmlFor="card-name">Name</Label>
@@ -120,11 +120,11 @@ export default function CardsManager() {
             className="flex items-center justify-between gap-2 py-3 text-sm"
           >
             <div>
-              <p className="font-medium text-stone-900">
+              <p className="font-medium text-stone-900 dark:text-stone-100 ">
                 {c.name}
                 {c.last4 ? ` ·${c.last4}` : ""}
               </p>
-              <p className="text-xs text-stone-500">
+              <p className="text-xs text-stone-500 dark:text-stone-400 ">
                 {c.isActive ? "Active" : "Inactive"}
                 {c.statementDay != null && c.dueDay != null
                   ? ` · stmt ${c.statementDay} · due ${c.dueDay}`
@@ -150,7 +150,7 @@ export default function CardsManager() {
           </li>
         ))}
         {cards.length === 0 && (
-          <li className="py-4 text-sm text-stone-500">No cards yet.</li>
+          <li className="py-4 text-sm text-stone-500 dark:text-stone-400 ">No cards yet.</li>
         )}
       </ul>
     </section>

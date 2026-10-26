@@ -21,6 +21,9 @@ export type Expense = {
   paymentMethod: PaymentMethod | null;
   cardId: string | null;
   card?: CreditCard | null;
+  /** True when this ledger row came from marking a due Paid */
+  fromPending?: boolean;
+  pendingId?: string | null;
 };
 
 export type SummaryCharts = {

@@ -10,7 +10,7 @@ export function Progress({
   return (
     <ProgressPrimitive.Root
       className={cn(
-        "relative h-2 w-full overflow-hidden rounded-full bg-stone-200",
+        "relative h-2 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-stone-700",
         className
       )}
       {...props}

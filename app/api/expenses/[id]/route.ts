@@ -79,11 +79,25 @@ export async function DELETE(_req: Request, { params }: Params) {
   const { id } = await params;
   const existing = await prisma.expense.findFirst({
     where: { id, userId: user.id },
+    include: { pendingPayment: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await prisma.expense.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    if (existing.pendingPayment) {
+      await tx.pendingPayment.update({
+        where: { id: existing.pendingPayment.id },
+        data: { status: "PENDING", expenseId: null },
+      });
+      await tx.recurringRule.update({
+        where: { id: existing.pendingPayment.ruleId },
+        data: { isActive: true },
+      });
+    }
+    await tx.expense.delete({ where: { id } });
+  });
+
   return NextResponse.json({ ok: true });
 }

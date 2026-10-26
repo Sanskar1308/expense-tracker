@@ -4,13 +4,41 @@ import { requireUser } from "../../../../../lib/session-user";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function POST(_req: Request, { params }: Params) {
+function parsePaidAt(value: unknown): Date | null {
+  if (value == null || value === "") return new Date();
+  if (typeof value !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const date = new Date(y, mo - 1, d, 12, 0, 0, 0);
+  if (
+    date.getFullYear() !== y ||
+    date.getMonth() !== mo - 1 ||
+    date.getDate() !== d
+  ) {
+    return null;
+  }
+  return date;
+}
+
+export async function POST(req: Request, { params }: Params) {
   const user = await requireUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await params;
+  const body = await req.json().catch(() => ({}));
+  const paidAt = parsePaidAt(body.paidAt);
+  if (!paidAt) {
+    return NextResponse.json(
+      { error: "paidAt must be YYYY-MM-DD" },
+      { status: 400 }
+    );
+  }
+
   const pending = await prisma.pendingPayment.findFirst({
     where: { id, userId: user.id },
     include: { rule: true },
@@ -32,7 +60,7 @@ export async function POST(_req: Request, { params }: Params) {
         type: pending.type,
         paymentMethod: pending.paymentMethod,
         cardId: pending.cardId,
-        createdAt: new Date(),
+        createdAt: paidAt,
       },
     });
 

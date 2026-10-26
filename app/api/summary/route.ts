@@ -90,7 +90,10 @@ export async function GET(req: Request) {
     }),
     prisma.expense.findMany({
       where: { userId: user.id },
-      include: { card: true },
+      include: {
+        card: true,
+        pendingPayment: { select: { id: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
@@ -245,7 +248,11 @@ export async function GET(req: Request) {
         limit: b.amount,
         spent: spentByCategory[b.category] ?? 0,
       })),
-    recent,
+    recent: recent.map(({ pendingPayment, ...e }) => ({
+      ...e,
+      fromPending: !!pendingPayment,
+      pendingId: pendingPayment?.id ?? null,
+    })),
     charts: {
       dailySpend: buildDailySpend(dailyRows, 30),
       byCategory: buildCategorySpend(monthDebits),

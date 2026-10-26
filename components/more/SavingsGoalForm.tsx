@@ -60,9 +60,9 @@ export default function SavingsGoalForm() {
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 p-4">
-      <h2 className="text-lg font-semibold text-stone-900">Savings goal</h2>
-      <p className="text-sm text-stone-600">
+    <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 dark:border-stone-700 dark:bg-stone-900/90 p-4">
+      <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100 ">Savings goal</h2>
+      <p className="text-sm text-stone-600 dark:text-stone-400 ">
         Progress uses your main balance (Cash/UPI).
       </p>
       {target && (

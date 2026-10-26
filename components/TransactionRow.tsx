@@ -46,13 +46,13 @@ export default function TransactionRow({
   });
 
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-stone-100 py-3 last:border-0">
+    <div className="flex items-start justify-between gap-3 border-b border-stone-100 dark:border-stone-800 py-3 last:border-0">
       <div className="min-w-0 space-y-1">
-        <p className="truncate font-medium text-stone-900">{expense.title}</p>
+        <p className="truncate font-medium text-stone-900 dark:text-stone-100 ">{expense.title}</p>
         <div className="flex flex-wrap items-center gap-1.5">
           {methodBadge(expense)}
           <Badge>{categoryLabel(expense.category)}</Badge>
-          <span className="text-xs text-stone-500">{date}</span>
+          <span className="text-xs text-stone-500 dark:text-stone-400 ">{date}</span>
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2">
@@ -60,7 +60,7 @@ export default function TransactionRow({
           className={
             isCredit
               ? "font-semibold text-emerald-700"
-              : "font-semibold text-stone-900"
+              : "font-semibold text-stone-900 dark:text-stone-100 "
           }
         >
           {isCredit ? "+" : "-"}

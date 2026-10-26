@@ -47,10 +47,10 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-md border border-stone-200 bg-white px-2 py-1 text-xs shadow-sm">
-      {label && <p className="text-stone-500">{label}</p>}
+    <div className="rounded-md border border-stone-200 bg-white px-2 py-1 text-xs shadow-sm dark:border-stone-600 dark:bg-stone-900">
+      {label && <p className="text-stone-500 dark:text-stone-400">{label}</p>}
       {payload.map((p, i) => (
-        <p key={i} className="font-medium text-stone-900">
+        <p key={i} className="font-medium text-stone-900 dark:text-stone-100">
           {formatRupee(Number(p.value ?? 0))}
         </p>
       ))}
@@ -139,7 +139,7 @@ export default function DashboardCharts({ charts }: { charts: SummaryCharts }) {
               <EmptyChart />
             )}
             {hasCategory && (
-              <ul className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px] text-stone-600">
+              <ul className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px] text-stone-600 dark:text-stone-400 ">
                 {charts.byCategory.slice(0, 6).map((c, i) => (
                   <li key={c.category} className="flex items-center gap-1">
                     <span
@@ -207,7 +207,7 @@ export default function DashboardCharts({ charts }: { charts: SummaryCharts }) {
 
 function EmptyChart() {
   return (
-    <div className="flex h-full min-h-24 items-center justify-center text-sm text-stone-500">
+    <div className="flex h-full min-h-24 items-center justify-center text-sm text-stone-500 dark:text-stone-400 ">
       Not enough spend data yet
     </div>
   );

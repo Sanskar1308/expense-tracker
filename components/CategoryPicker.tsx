@@ -36,26 +36,30 @@ export default function CategoryPicker({
     load();
   }, [load]);
 
-  async function addCategory(e: React.FormEvent) {
-    e.preventDefault();
+  async function addCategory() {
+    const name = newName.trim();
+    if (!name) {
+      setError("Name required");
+      return;
+    }
     setError("");
     setSaving(true);
     try {
       const res = await fetch("/api/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName }),
+        body: JSON.stringify({ name }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || "Could not add");
         return;
       }
-      const name = data.name as string;
+      const created = data.name as string;
       setNewName("");
       setAdding(false);
       await load();
-      onChange(name);
+      onChange(created);
     } finally {
       setSaving(false);
     }
@@ -73,7 +77,7 @@ export default function CategoryPicker({
               "rounded-full px-3 py-1.5 text-sm",
               value === c.value
                 ? "bg-emerald-700 text-white"
-                : "bg-stone-100 text-stone-800"
+                : "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200"
             )}
           >
             {c.label}
@@ -94,17 +98,27 @@ export default function CategoryPicker({
       </div>
 
       {adding && (
-        <form onSubmit={addCategory} className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             autoFocus
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void addCategory();
+              }
+            }}
             placeholder="New category name"
             className="max-w-[200px]"
             maxLength={40}
-            required
           />
-          <Button type="submit" size="sm" disabled={saving}>
+          <Button
+            type="button"
+            size="sm"
+            disabled={saving}
+            onClick={() => void addCategory()}
+          >
             {saving ? "Adding…" : "Add"}
           </Button>
           <Button
@@ -119,7 +133,7 @@ export default function CategoryPicker({
           >
             Cancel
           </Button>
-        </form>
+        </div>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>

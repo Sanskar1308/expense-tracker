@@ -39,7 +39,7 @@ export default function DashboardPage() {
   }
 
   if (!summary) {
-    return <p className="text-stone-600">Loading dashboard…</p>;
+    return <p className="text-stone-600 dark:text-stone-400 ">Loading dashboard…</p>;
   }
 
   const daysLeftGoal = summary.savings
@@ -53,7 +53,7 @@ export default function DashboardPage() {
     <div className="space-y-4 md:space-y-6">
       <header className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-stone-900 md:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-100 md:text-3xl">
             Dashboard
             {(summary.duesBadge ?? 0) > 0 && (
               <Link
@@ -64,7 +64,7 @@ export default function DashboardPage() {
               </Link>
             )}
           </h1>
-          <p className="text-sm text-stone-600">
+          <p className="text-sm text-stone-600 dark:text-stone-400 ">
             Cash & UPI balance · cards separate
           </p>
         </div>
@@ -74,7 +74,7 @@ export default function DashboardPage() {
       </header>
 
       {toast && (
-        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <p className="rounded-md bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
           {toast}
         </p>
       )}
@@ -106,19 +106,19 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="grid grid-cols-3 gap-2 text-center text-sm md:gap-6 md:text-left">
             <div>
-              <p className="text-stone-500">Credited</p>
+              <p className="text-stone-500 dark:text-stone-400 ">Credited</p>
               <p className="text-lg font-semibold text-emerald-700 md:text-2xl">
                 {formatRupee(summary.month.credited)}
               </p>
             </div>
             <div>
-              <p className="text-stone-500">Cash/UPI</p>
+              <p className="text-stone-500 dark:text-stone-400 ">Cash/UPI</p>
               <p className="text-lg font-semibold md:text-2xl">
                 {formatRupee(summary.month.spentCashUpi)}
               </p>
             </div>
             <div>
-              <p className="text-stone-500">Cards</p>
+              <p className="text-stone-500 dark:text-stone-400 ">Cards</p>
               <p className="text-lg font-semibold md:text-2xl">
                 {formatRupee(summary.month.spentCc)}
               </p>
@@ -133,7 +133,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader className="flex-row items-center justify-between space-y-0">
                 <CardTitle>Upcoming dues</CardTitle>
-                <Link href="/dues" className="text-xs text-emerald-800 underline">
+                <Link href="/dues" className="text-xs text-emerald-800 dark:text-emerald-300 underline">
                   See all
                 </Link>
               </CardHeader>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
                     <span>
                       {b.name}
                       {b.dueSoon ? " · due soon" : ""}
-                      <span className="block text-xs text-stone-500">
+                      <span className="block text-xs text-stone-500 dark:text-stone-400 ">
                         Due{" "}
                         {new Date(b.dueDate).toLocaleDateString("en-IN", {
                           day: "numeric",
@@ -210,7 +210,7 @@ export default function DashboardPage() {
                     ? "text-sm font-medium text-rose-700"
                     : summary.compare.deltaPct < 0
                       ? "text-sm font-medium text-emerald-700"
-                      : "text-sm text-stone-500"
+                      : "text-sm text-stone-500 dark:text-stone-400 "
                 }
               >
                 {summary.compare.deltaPct > 0 ? "↑" : summary.compare.deltaPct < 0 ? "↓" : "→"}{" "}
@@ -219,7 +219,7 @@ export default function DashboardPage() {
               </p>
             </div>
             {summary.compare.movers.length > 0 && (
-              <ul className="space-y-1 text-sm text-stone-600">
+              <ul className="space-y-1 text-sm text-stone-600 dark:text-stone-400 ">
                 {summary.compare.movers.slice(0, 4).map((m) => (
                   <li key={m.category} className="flex justify-between">
                     <span>{m.name}</span>
@@ -317,20 +317,20 @@ export default function DashboardPage() {
               <CardTitle>Recent</CardTitle>
               <Link
                 href="/activity"
-                className="text-xs text-emerald-800 underline"
+                className="text-xs text-emerald-800 dark:text-emerald-300 underline"
               >
                 See all
               </Link>
             </CardHeader>
             <CardContent>
               {summary.recent.length === 0 ? (
-                <p className="text-sm text-stone-500">No transactions yet.</p>
+                <p className="text-sm text-stone-500 dark:text-stone-400 ">No transactions yet.</p>
               ) : (
                 summary.recent.map((e) => (
                   <TransactionRow
                     key={e.id}
                     expense={e}
-                    onRepeat={() => repeat(e.id)}
+                    onRepeat={e.fromPending ? undefined : () => repeat(e.id)}
                   />
                 ))
               )}

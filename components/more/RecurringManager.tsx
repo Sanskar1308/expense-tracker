@@ -100,13 +100,13 @@ export default function RecurringManager() {
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 p-4">
-      <h2 className="text-lg font-semibold text-stone-900">Recurring</h2>
-      <p className="text-sm text-stone-600">
+    <section className="space-y-3 rounded-xl border border-stone-200 bg-white/90 dark:border-stone-700 dark:bg-stone-900/90 p-4">
+      <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100 ">Recurring</h2>
+      <p className="text-sm text-stone-600 dark:text-stone-400 ">
         EMI, OTT, rent — creates Pending dues until you mark Paid.
       </p>
 
-      <form onSubmit={add} className="space-y-3 border-b border-stone-100 pb-4">
+      <form onSubmit={add} className="space-y-3 border-b border-stone-100 dark:border-stone-800 pb-4">
         <div>
           <Label>Title</Label>
           <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} required />
@@ -202,13 +202,13 @@ export default function RecurringManager() {
         {rules.map((r) => (
           <li key={r.id} className="flex items-start justify-between gap-2 py-3 text-sm">
             <div>
-              <p className="font-medium text-stone-900">
+              <p className="font-medium text-stone-900 dark:text-stone-100 ">
                 {r.title}{" "}
-                <span className="font-normal text-stone-500">
+                <span className="font-normal text-stone-500 dark:text-stone-400 ">
                   {formatRupee(r.amount)}
                 </span>
               </p>
-              <p className="text-xs text-stone-500">
+              <p className="text-xs text-stone-500 dark:text-stone-400 ">
                 Day {r.dayOfMonth}
                 {r.payee ? ` · ${r.payee}` : ""}
                 {r.totalMonths != null
@@ -228,7 +228,7 @@ export default function RecurringManager() {
           </li>
         ))}
         {rules.length === 0 && (
-          <li className="py-4 text-sm text-stone-500">No recurring rules yet.</li>
+          <li className="py-4 text-sm text-stone-500 dark:text-stone-400 ">No recurring rules yet.</li>
         )}
       </ul>
     </section>

@@ -11,6 +11,12 @@ export async function GET() {
 
   await ensurePendingsForUser(user.id);
 
+  // Heal: expense deleted left status PAID with no expenseId
+  await prisma.pendingPayment.updateMany({
+    where: { userId: user.id, status: "PAID", expenseId: null },
+    data: { status: "PENDING" },
+  });
+
   const pendings = await prisma.pendingPayment.findMany({
     where: { userId: user.id },
     include: {

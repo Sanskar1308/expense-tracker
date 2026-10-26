@@ -24,7 +24,7 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur md:hidden">
+    <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur dark:border-stone-700 dark:bg-stone-950/95 md:hidden">
       <div className="mx-auto flex max-w-lg items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
         {links.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
@@ -34,7 +34,9 @@ export default function BottomNav() {
               href={href}
               className={cn(
                 "flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium",
-                active ? "text-emerald-800" : "text-stone-500"
+                active
+                  ? "text-emerald-800 dark:text-emerald-400"
+                  : "text-stone-500 dark:text-stone-400"
               )}
             >
               <Icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
@@ -52,12 +54,12 @@ export function SideNav() {
   const pathname = usePathname();
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-stone-200/80 bg-white/70 px-3 py-6 backdrop-blur md:flex">
+    <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-stone-200/80 bg-white/70 px-3 py-6 backdrop-blur dark:border-stone-700/80 dark:bg-stone-950/70 md:flex">
       <div className="mb-8 px-2">
-        <p className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight text-stone-900">
+        <p className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
           Expense Tracker
         </p>
-        <p className="text-xs text-stone-500">Cash · UPI · Cards</p>
+        <p className="text-xs text-stone-500 dark:text-stone-400">Cash · UPI · Cards</p>
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {links.map(({ href, label, icon: Icon }) => {
@@ -69,8 +71,8 @@ export function SideNav() {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
-                  ? "bg-emerald-700 text-white"
-                  : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+                  ? "bg-emerald-700 text-white dark:bg-emerald-600"
+                  : "text-stone-600 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
               )}
             >
               <Icon className="h-4 w-4" />

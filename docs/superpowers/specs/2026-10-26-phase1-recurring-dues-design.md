@@ -92,9 +92,10 @@ On summary / dues fetch (authenticated):
 ### Mark Paid
 
 1. Validate pending owned + `PENDING`
-2. Create `Expense` from snapshot (`createdAt = now` or dueDate — **use now**)
-3. Set `expenseId`, status `PAID`
-4. If EMI complete → deactivate rule
+2. Prompt for payment date: default **Today**, or **Change date** (any `YYYY-MM-DD`; picker starts at due date)
+3. Create `Expense` from snapshot with `createdAt` = chosen date (`paidAt` body; omit → now)
+4. Set `expenseId`, status `PAID`
+5. If EMI complete → deactivate rule
 
 ### Skip
 

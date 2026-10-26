@@ -15,9 +15,16 @@ export async function POST(req: Request) {
 
   const source = await prisma.expense.findFirst({
     where: { id, userId: user.id },
+    include: { pendingPayment: { select: { id: true } } },
   });
   if (!source) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  if (source.pendingPayment) {
+    return NextResponse.json(
+      { error: "Recurring dues can't be repeated — use Dues next cycle" },
+      { status: 400 }
+    );
   }
 
   const clone = await prisma.expense.create({

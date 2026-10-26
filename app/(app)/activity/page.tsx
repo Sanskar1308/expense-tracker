@@ -107,6 +107,8 @@ export default function ActivityPage() {
         type: e.type,
         paymentMethod: e.paymentMethod,
         cardId: e.cardId,
+        createdAt: e.createdAt,
+        pendingId: e.pendingId ?? undefined,
       }),
     });
     load();
@@ -115,20 +117,20 @@ export default function ActivityPage() {
   return (
     <div className="space-y-4 md:space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-stone-900 md:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-100 md:text-3xl">
           Activity
         </h1>
-        <p className="text-sm text-stone-600">Search, filter, edit, or repeat.</p>
+        <p className="text-sm text-stone-600 dark:text-stone-400 ">Search, filter, edit, or repeat.</p>
       </header>
 
       {toast && (
-        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <p className="rounded-md bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
           {toast}
         </p>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(240px,320px)_1fr] lg:gap-6 lg:items-start">
-      <div className="space-y-3 rounded-xl border border-stone-200 bg-white/90 p-3 md:p-4 lg:sticky lg:top-8">
+      <div className="space-y-3 rounded-xl border border-stone-200 bg-white/90 dark:border-stone-700 dark:bg-stone-900/90 p-3 md:p-4 lg:sticky lg:top-8">
         <div>
           <Label htmlFor="search">Search</Label>
           <Input
@@ -217,9 +219,9 @@ export default function ActivityPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-stone-200 bg-white/90 px-3 md:px-4">
+      <div className="rounded-xl border border-stone-200 bg-white/90 dark:border-stone-700 dark:bg-stone-900/90 px-3 md:px-4">
         {expenses.length === 0 ? (
-          <p className="py-8 text-center text-sm text-stone-500">
+          <p className="py-8 text-center text-sm text-stone-500 dark:text-stone-400 ">
             No matching transactions.
           </p>
         ) : (
@@ -227,7 +229,7 @@ export default function ActivityPage() {
             <TransactionRow
               key={e.id}
               expense={e}
-              onRepeat={() => repeat(e.id)}
+              onRepeat={e.fromPending ? undefined : () => repeat(e.id)}
               onEdit={() => setEditing(e)}
               onDelete={() => remove(e.id)}
             />

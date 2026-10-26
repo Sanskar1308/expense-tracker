@@ -44,11 +44,20 @@ export async function GET(req: Request) {
 
   const expenses = await prisma.expense.findMany({
     where,
-    include: { card: true },
+    include: {
+      card: true,
+      pendingPayment: { select: { id: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(expenses);
+  return NextResponse.json(
+    expenses.map(({ pendingPayment, ...e }) => ({
+      ...e,
+      fromPending: !!pendingPayment,
+      pendingId: pendingPayment?.id ?? null,
+    }))
+  );
 }
 
 export async function POST(req: Request) {
@@ -91,18 +100,60 @@ export async function POST(req: Request) {
     }
   }
 
-  const newExpense = await prisma.expense.create({
-    data: {
-      title: String(body.title).trim(),
-      amount,
-      category: String(body.category).trim(),
-      type,
-      paymentMethod,
-      cardId,
-      userId: user.id,
-    },
-    include: { card: true },
+  let createdAt: Date | undefined;
+  if (body.createdAt != null && body.createdAt !== "") {
+    const parsed = new Date(body.createdAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return NextResponse.json({ error: "Invalid createdAt" }, { status: 400 });
+    }
+    createdAt = parsed;
+  }
+
+  const pendingId =
+    typeof body.pendingId === "string" && body.pendingId
+      ? body.pendingId
+      : null;
+
+  if (pendingId) {
+    const pending = await prisma.pendingPayment.findFirst({
+      where: { id: pendingId, userId: user.id, status: "PENDING" },
+    });
+    if (!pending) {
+      return NextResponse.json(
+        { error: "Pending due not found or already paid" },
+        { status: 400 }
+      );
+    }
+  }
+
+  const newExpense = await prisma.$transaction(async (tx) => {
+    const expense = await tx.expense.create({
+      data: {
+        title: String(body.title).trim(),
+        amount,
+        category: String(body.category).trim(),
+        type,
+        paymentMethod,
+        cardId,
+        userId: user.id,
+        ...(createdAt ? { createdAt } : {}),
+      },
+      include: { card: true },
+    });
+
+    if (pendingId) {
+      await tx.pendingPayment.update({
+        where: { id: pendingId },
+        data: { status: "PAID", expenseId: expense.id },
+      });
+    }
+
+    return expense;
   });
 
-  return NextResponse.json(newExpense);
+  return NextResponse.json({
+    ...newExpense,
+    fromPending: !!pendingId,
+    pendingId,
+  });
 }
