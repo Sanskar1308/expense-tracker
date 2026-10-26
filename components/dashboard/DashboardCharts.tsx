@@ -70,7 +70,7 @@ export default function DashboardCharts({ charts }: { charts: SummaryCharts }) {
         <CardHeader>
           <CardTitle>Daily spend · 30 days</CardTitle>
         </CardHeader>
-        <CardContent className="h-48">
+        <CardContent className="h-48 md:h-64">
           {hasDaily ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={charts.dailySpend}>
@@ -113,7 +113,7 @@ export default function DashboardCharts({ charts }: { charts: SummaryCharts }) {
           <CardHeader>
             <CardTitle>By category · month</CardTitle>
           </CardHeader>
-          <CardContent className="h-52">
+          <CardContent className="h-52 md:h-60">
             {hasCategory ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -158,7 +158,7 @@ export default function DashboardCharts({ charts }: { charts: SummaryCharts }) {
           <CardHeader>
             <CardTitle>Cash · UPI · Card · month</CardTitle>
           </CardHeader>
-          <CardContent className="h-52">
+          <CardContent className="h-52 md:h-60">
             {hasMethod ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={charts.byMethod}>
