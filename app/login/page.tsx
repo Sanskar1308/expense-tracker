@@ -1,18 +1,33 @@
-'use client';
+"use client";
 
 import { signIn } from "next-auth/react";
+import { Button } from "../../components/ui/button";
 
 export default function LoginPage() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
-      <div className="p-8 bg-gray-800 rounded-lg shadow-lg w-full max-w-sm">
-        <h1 className="text-2xl font-bold mb-6 text-center">Login</h1>
-        <button
-          onClick={() => signIn("github")}
-          className="w-full py-2 px-4 bg-white text-black font-semibold rounded hover:bg-gray-200"
-        >
-          Sign in with GitHub
-        </button>
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-sm space-y-6 rounded-2xl border border-stone-200 bg-white/90 p-8 shadow-sm">
+        <div className="space-y-1 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight text-stone-900">
+            Expense Tracker
+          </h1>
+          <p className="text-sm text-stone-600">
+            Cash, UPI, and cards in one ledger.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Button className="w-full" size="lg" onClick={() => signIn("github", { callbackUrl: "/" })}>
+            Sign in with GitHub
+          </Button>
+          <Button
+            className="w-full"
+            size="lg"
+            variant="outline"
+            onClick={() => signIn("google", { callbackUrl: "/" })}
+          >
+            Sign in with Google
+          </Button>
+        </div>
       </div>
     </div>
   );
