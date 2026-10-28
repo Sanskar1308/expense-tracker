@@ -16,6 +16,8 @@ import {
 } from "../../../lib/types";
 import { apiSend } from "../../../lib/api-client";
 import {
+  useAccounts,
+  useCards,
   useCategories,
   useDeleteExpense,
   useExpenses,
@@ -29,6 +31,8 @@ export default function ActivityPage() {
   const [type, setType] = useState<"" | TransactionType>("");
   const [method, setMethod] = useState<"" | PaymentMethod>("");
   const [category, setCategory] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [cardId, setCardId] = useState("");
   const [range, setRange] = useState<"all" | "week" | "month">("month");
   const [editing, setEditing] = useState<Expense | null>(null);
   const [toast, setToast] = useState("");
@@ -45,9 +49,13 @@ export default function ActivityPage() {
     method,
     category,
     range,
+    accountId,
+    cardId,
   };
 
   const { data: expenses = [], isPending } = useExpenses(filters);
+  const { data: accountData } = useAccounts();
+  const { data: cards = [] } = useCards();
   const { data: categories = DEFAULT_CATEGORIES.map((c) => ({
     ...c,
     custom: false as boolean | undefined,
@@ -84,6 +92,7 @@ export default function ActivityPage() {
       type: e.type,
       paymentMethod: e.paymentMethod,
       cardId: e.cardId,
+      accountId: e.accountId,
       createdAt: e.createdAt,
       pendingId: e.pendingId ?? undefined,
     });
@@ -173,6 +182,38 @@ export default function ActivityPage() {
                 {m}
               </Button>
             ))}
+          </div>
+          <div>
+            <Label htmlFor="account">Account</Label>
+            <select
+              id="account"
+              className="mt-1 flex h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm dark:border-stone-600 dark:bg-stone-900"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+            >
+              <option value="">Any account</option>
+              {(accountData?.accounts ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="card">Card</Label>
+            <select
+              id="card"
+              className="mt-1 flex h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm dark:border-stone-600 dark:bg-stone-900"
+              value={cardId}
+              onChange={(e) => setCardId(e.target.value)}
+            >
+              <option value="">Any card</option>
+              {cards.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button

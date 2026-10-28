@@ -15,7 +15,9 @@ import {
 import UndoToast from "../../../components/UndoToast";
 import { formatRupee } from "../../../lib/utils";
 import { calendarKey, formatDueDate } from "../../../lib/due-dates";
+import AccountPicker from "../../../components/AccountPicker";
 import {
+  useAccounts,
   usePayPending,
   usePendings,
   useSkipPending,
@@ -30,6 +32,9 @@ type Pending = {
   dueDate: string;
   status: "PENDING" | "PAID" | "SKIPPED";
   paymentMethod: string | null;
+  type?: "CREDIT" | "DEBIT";
+  investmentId?: string | null;
+  investment?: { id: string; kind: string; name: string } | null;
   paidCount: number;
   totalMonths: number | null;
 };
@@ -40,17 +45,23 @@ function toDateInputValue(d: Date) {
 
 export default function DuesPage() {
   const { data: items = [], isPending } = usePendings();
+  const { data: accountData } = useAccounts();
+  const accounts = (accountData?.accounts ?? []).filter((a) => a.isActive);
   const payMutation = usePayPending();
   const skipMutation = useSkipPending();
   const undoMutation = useUndoPayPending();
 
   const [undo, setUndo] = useState<{ id: string } | null>(null);
   const [paying, setPaying] = useState<Pending | null>(null);
+  const [payAccountId, setPayAccountId] = useState("");
+  const [payError, setPayError] = useState("");
   const [dateMode, setDateMode] = useState<"today" | "custom">("today");
   const [customDate, setCustomDate] = useState("");
 
   function openPay(p: Pending) {
     setPaying(p);
+    setPayError("");
+    setPayAccountId(accounts.length === 1 ? accounts[0].id : "");
     setDateMode("today");
     setCustomDate(toDateInputValue(new Date(p.dueDate)));
   }
@@ -61,14 +72,24 @@ export default function DuesPage() {
       dateMode === "today" ? toDateInputValue(new Date()) : customDate;
     if (!paidAt) return;
 
+    const needsAccount = paying.paymentMethod !== "CC";
+    if (needsAccount && !payAccountId) {
+      setPayError("Pick an account");
+      return;
+    }
+
     try {
-      await payMutation.mutateAsync({ id: paying.id, paidAt });
+      await payMutation.mutateAsync({
+        id: paying.id,
+        paidAt,
+        accountId: needsAccount ? payAccountId : undefined,
+      });
       const id = paying.id;
       setPaying(null);
       setUndo({ id });
       setTimeout(() => setUndo((u) => (u?.id === id ? null : u)), 8000);
-    } catch {
-      /* mutation error surfaced via disabled/retry */
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : "Could not mark paid");
     }
   }
 
@@ -123,8 +144,22 @@ export default function DuesPage() {
                 </p>
                 <div className="flex flex-wrap gap-1.5 text-xs text-stone-500 dark:text-stone-400">
                   {p.payee && <Badge>To: {p.payee}</Badge>}
-                  {p.paymentMethod && (
-                    <Badge variant="default">{p.paymentMethod}</Badge>
+                  {p.investment ? (
+                    <Badge>
+                      {p.investment.kind === "RD"
+                        ? "RD"
+                        : p.investment.kind === "MF"
+                          ? "SIP"
+                          : "Invest"}
+                    </Badge>
+                  ) : p.investmentId ? (
+                    <Badge>Invest</Badge>
+                  ) : p.type === "CREDIT" ? (
+                    <Badge variant="credit">Income</Badge>
+                  ) : (
+                    p.paymentMethod && (
+                      <Badge variant="default">{p.paymentMethod}</Badge>
+                    )
                   )}
                   <span>
                     Due {formatDueDate(p.dueDate)}
@@ -214,6 +249,29 @@ export default function DuesPage() {
               </Button>
             </div>
 
+            {paying?.paymentMethod !== "CC" && (
+              <div>
+                <Label>
+                  {paying?.type === "CREDIT" && !paying.investmentId
+                    ? "Into account"
+                    : "Pay from"}
+                </Label>
+                <div className="mt-2">
+                  {accounts.length === 0 ? (
+                    <p className="text-sm text-stone-600 dark:text-stone-400">
+                      Add an account in More first.
+                    </p>
+                  ) : (
+                    <AccountPicker
+                      accounts={accounts}
+                      value={payAccountId}
+                      onChange={setPayAccountId}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
             {dateMode === "custom" && (
               <div>
                 <Label htmlFor="paid-at">Date</Label>
@@ -231,6 +289,7 @@ export default function DuesPage() {
               </div>
             )}
 
+            {payError && <p className="text-sm text-red-600">{payError}</p>}
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 type="button"
@@ -245,7 +304,8 @@ export default function DuesPage() {
                 onClick={() => void confirmPay()}
                 disabled={
                   payMutation.isPending ||
-                  (dateMode === "custom" && !customDate)
+                  (dateMode === "custom" && !customDate) ||
+                  (paying?.paymentMethod !== "CC" && !payAccountId)
                 }
               >
                 {payMutation.isPending ? "Saving…" : "Confirm"}

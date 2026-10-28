@@ -17,12 +17,35 @@ export async function POST(_req: Request, { params }: Params) {
   if (!pending) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (pending.status !== "PAID" || !pending.expenseId) {
+  const move = await prisma.ledgerMove.findUnique({
+    where: { pendingId: id },
+  });
+  if (pending.status !== "PAID" || (!pending.expenseId && !move)) {
     return NextResponse.json({ error: "Nothing to undo" }, { status: 400 });
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    await tx.expense.delete({ where: { id: pending.expenseId! } });
+    if (move) {
+      if (move.investmentId) {
+        const inv = await tx.investment.findUnique({
+          where: { id: move.investmentId },
+        });
+        if (inv) {
+          // ponytail: subtract the cut even if current value was edited after
+          await tx.investment.update({
+            where: { id: inv.id },
+            data: {
+              investedAmount: Math.max(0, inv.investedAmount - move.amount),
+              currentValue: Math.max(0, inv.currentValue - move.amount),
+            },
+          });
+        }
+      }
+      await tx.ledgerMove.delete({ where: { id: move.id } });
+    }
+    if (pending.expenseId) {
+      await tx.expense.delete({ where: { id: pending.expenseId } });
+    }
     const updated = await tx.pendingPayment.update({
       where: { id },
       data: { status: "PENDING", expenseId: null },

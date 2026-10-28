@@ -3,6 +3,7 @@ import { PaymentMethod, TransactionType } from "@prisma/client";
 import { prisma } from "../../../../lib/prisma";
 import { requireUser } from "../../../../lib/session-user";
 import { validateTransactionPayload } from "../../../../lib/money";
+import { findOwnAccount } from "../../../../lib/accounts";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -54,6 +55,22 @@ export async function PATCH(req: Request, { params }: Params) {
     }
   }
 
+  let accountId: string | null = null;
+  if (!cardId && body.accountId) {
+    const account = await findOwnAccount(user.id, body.accountId);
+    if (!account) {
+      return NextResponse.json({ error: "Invalid account" }, { status: 400 });
+    }
+    accountId = account.id;
+  } else if (!cardId) {
+    const accountCount = await prisma.moneyAccount.count({
+      where: { userId: user.id, isActive: true },
+    });
+    if (accountCount > 0) {
+      return NextResponse.json({ error: "Account required" }, { status: 400 });
+    }
+  }
+
   const updated = await prisma.expense.update({
     where: { id },
     data: {
@@ -63,8 +80,9 @@ export async function PATCH(req: Request, { params }: Params) {
       type,
       paymentMethod,
       cardId,
+      accountId,
     },
-    include: { card: true },
+    include: { card: true, account: { select: { id: true, name: true } } },
   });
 
   return NextResponse.json(updated);

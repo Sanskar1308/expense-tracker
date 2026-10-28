@@ -1,0 +1,3 @@
+ALTER TYPE "InvestmentKind" ADD VALUE 'SILVER';
+
+ALTER TABLE "Investment" ADD COLUMN "grams" DOUBLE PRECISION;

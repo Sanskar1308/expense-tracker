@@ -9,6 +9,8 @@ export const queryKeys = {
   recurring: ["recurring"] as const,
   budgets: (month?: string) => ["budgets", month ?? "current"] as const,
   savingsGoal: ["savings-goal"] as const,
+  accounts: ["accounts"] as const,
+  investments: ["investments"] as const,
 };
 
 /** Invalidate after money-changing actions */
@@ -18,4 +20,7 @@ export const moneyQueryRoots = [
   "expenses",
   "budgets",
   "savings-goal",
+  "accounts",
+  "investments",
+  "recurring",
 ] as const;

@@ -116,6 +116,8 @@ export async function ensurePendingsForUser(userId: string) {
           type: rule.type,
           paymentMethod: rule.paymentMethod,
           cardId: rule.cardId,
+          accountId: rule.accountId,
+          investmentId: rule.investmentId,
           payee: rule.payee,
           dueDate,
           status: "PENDING",

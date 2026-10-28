@@ -52,6 +52,11 @@ export default function TransactionRow({
         <div className="flex flex-wrap items-center gap-1.5">
           {methodBadge(expense)}
           <Badge>{categoryLabel(expense.category)}</Badge>
+          {expense.account?.name && (
+            <span className="text-xs text-stone-500 dark:text-stone-400">
+              {expense.account.name}
+            </span>
+          )}
           <span className="text-xs text-stone-500 dark:text-stone-400 ">{date}</span>
         </div>
       </div>

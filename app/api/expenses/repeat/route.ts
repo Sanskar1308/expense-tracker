@@ -35,6 +35,7 @@ export async function POST(req: Request) {
       type: source.type,
       paymentMethod: source.paymentMethod,
       cardId: source.cardId,
+      accountId: source.accountId,
       userId: user.id,
       createdAt: new Date(),
     },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import { requireUser } from "../../../../../lib/session-user";
+import { findOwnAccount } from "../../../../../lib/accounts";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -50,7 +51,80 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Already processed" }, { status: 400 });
   }
 
+  const investmentId = pending.investmentId ?? pending.rule.investmentId;
+  const isCard = pending.paymentMethod === "CC" || !!pending.cardId;
+  let accountId: string | null = null;
+
+  if (!isCard) {
+    const chosen = body.accountId || pending.accountId || pending.rule.accountId;
+    const account = await findOwnAccount(user.id, chosen);
+    const accountCount = await prisma.moneyAccount.count({
+      where: { userId: user.id, isActive: true },
+    });
+    if (!account && (investmentId || accountCount > 0)) {
+      return NextResponse.json({ error: "Pick an account" }, { status: 400 });
+    }
+    if (chosen && !account) {
+      return NextResponse.json({ error: "Invalid account" }, { status: 400 });
+    }
+    accountId = account?.id ?? null;
+  }
+
+  if (investmentId) {
+    const inv = await prisma.investment.findFirst({
+      where: { id: investmentId, userId: user.id },
+    });
+    if (!inv) {
+      return NextResponse.json({ error: "Investment missing" }, { status: 400 });
+    }
+  }
+
   const result = await prisma.$transaction(async (tx) => {
+    if (investmentId) {
+      const inv = await tx.investment.findFirst({
+        where: { id: investmentId, userId: user.id },
+      });
+      if (!inv || !accountId) {
+        throw new Error("Investment missing");
+      }
+      await tx.ledgerMove.create({
+        data: {
+          userId: user.id,
+          amount: pending.amount,
+          fromAccountId: accountId,
+          investmentId: inv.id,
+          pendingId: pending.id,
+          note: pending.title,
+          createdAt: paidAt,
+        },
+      });
+      await tx.investment.update({
+        where: { id: inv.id },
+        data: {
+          investedAmount: inv.investedAmount + pending.amount,
+          currentValue: inv.currentValue + pending.amount,
+        },
+      });
+      const updated = await tx.pendingPayment.update({
+        where: { id },
+        data: { status: "PAID", accountId },
+      });
+
+      const paidCount = await tx.pendingPayment.count({
+        where: { ruleId: pending.ruleId, status: "PAID" },
+      });
+      if (
+        pending.rule.totalMonths != null &&
+        paidCount >= pending.rule.totalMonths
+      ) {
+        await tx.recurringRule.update({
+          where: { id: pending.ruleId },
+          data: { isActive: false },
+        });
+      }
+      return { pending: updated, expense: null, paidCount };
+    }
+
     const expense = await tx.expense.create({
       data: {
         userId: user.id,
@@ -60,6 +134,7 @@ export async function POST(req: Request, { params }: Params) {
         type: pending.type,
         paymentMethod: pending.paymentMethod,
         cardId: pending.cardId,
+        accountId: pending.cardId ? null : accountId,
         createdAt: paidAt,
       },
     });

@@ -12,12 +12,13 @@ type Heatmap = {
 };
 
 function cellColor(amount: number, max: number) {
-  if (max <= 0 || amount <= 0) return "bg-stone-100 text-stone-400 dark:bg-stone-800 dark:text-stone-500";
+  if (max <= 0 || amount <= 0)
+    return "bg-stone-100 text-stone-400 dark:bg-stone-800 dark:text-stone-500";
   const t = amount / max;
-  if (t < 0.25) return "bg-emerald-100 text-emerald-900";
-  if (t < 0.5) return "bg-emerald-300 text-emerald-950";
-  if (t < 0.75) return "bg-emerald-50 dark:bg-emerald-950/500 text-white";
-  return "bg-emerald-700 text-white";
+  if (t < 0.25) return "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200";
+  if (t < 0.5) return "bg-emerald-300 text-emerald-950 dark:bg-emerald-800 dark:text-emerald-50";
+  if (t < 0.75) return "bg-emerald-500 text-white dark:bg-emerald-600";
+  return "bg-emerald-700 text-white dark:bg-emerald-500";
 }
 
 export default function WeekdayHeatmap({ data }: { data: Heatmap }) {

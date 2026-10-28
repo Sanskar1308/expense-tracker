@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import CategoryPicker from "../CategoryPicker";
+import AccountPicker from "../AccountPicker";
 import {
   COMMON_TITLES,
   type PaymentMethod,
@@ -13,6 +14,7 @@ import {
 } from "../../lib/types";
 import { cn } from "../../lib/utils";
 import {
+  useAccounts,
   useCards,
   useCreateExpense,
 } from "../../hooks/useFinanceQueries";
@@ -33,9 +35,17 @@ export default function AddTransactionForm({
   const [category, setCategory] = useState("OTHER");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [cardId, setCardId] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [message, setMessage] = useState("");
   const { data: cards = [] } = useCards();
+  const { data: accountData } = useAccounts();
+  const accounts = Array.isArray(accountData?.accounts)
+    ? accountData.accounts
+    : [];
   const createExpense = useCreateExpense();
+  const activeAccounts = accounts.filter((a) => a.isActive);
+  const selectedAccountId =
+    accountId || activeAccounts[0]?.id || "";
 
   useEffect(() => {
     amountRef.current?.focus();
@@ -47,7 +57,9 @@ export default function AddTransactionForm({
     if (savedCard) setCardId(savedCard);
   }, []);
 
-  const activeCards = cards.filter((c) => c.isActive);
+  const activeCards = Array.isArray(cards)
+    ? cards.filter((c) => c.isActive)
+    : [];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,7 +72,19 @@ export default function AddTransactionForm({
         type,
         paymentMethod: type === "CREDIT" ? null : paymentMethod,
         cardId: type === "DEBIT" && paymentMethod === "CC" ? cardId : null,
+        accountId:
+          type === "DEBIT" && paymentMethod === "CC"
+            ? null
+            : selectedAccountId || null,
       };
+
+      const needsAccount =
+        activeAccounts.length > 0 &&
+        !(type === "DEBIT" && paymentMethod === "CC");
+      if (needsAccount && !selectedAccountId) {
+        setMessage("Pick an account.");
+        return;
+      }
 
       if (type === "DEBIT" && paymentMethod === "CC" && !cardId) {
         setMessage("Add a card in More, or pick one.");
@@ -160,6 +184,18 @@ export default function AddTransactionForm({
           ))}
         </div>
       </div>
+
+      {activeAccounts.length > 0 &&
+        (type === "CREDIT" || paymentMethod !== "CC") && (
+          <div className="space-y-2">
+            <Label>Account</Label>
+            <AccountPicker
+              accounts={activeAccounts}
+              value={selectedAccountId}
+              onChange={setAccountId}
+            />
+          </div>
+        )}
 
       {type === "DEBIT" && (
         <div className="space-y-3">

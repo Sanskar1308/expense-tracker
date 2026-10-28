@@ -60,7 +60,7 @@ export function SideNav() {
         <p className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
           Expense Tracker
         </p>
-        <p className="text-xs text-stone-500 dark:text-stone-400">Cash · UPI · Cards</p>
+        <p className="text-xs text-stone-500 dark:text-stone-400">Accounts · Cards · Invest</p>
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {links.map(({ href, label, icon: Icon }) => {

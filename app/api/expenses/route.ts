@@ -3,6 +3,7 @@ import { PaymentMethod, Prisma, TransactionType } from "@prisma/client";
 import { prisma } from "../../../lib/prisma";
 import { requireUser } from "../../../lib/session-user";
 import { validateTransactionPayload } from "../../../lib/money";
+import { findOwnAccount } from "../../../lib/accounts";
 
 export async function GET(req: Request) {
   const user = await requireUser();
@@ -35,6 +36,8 @@ export async function GET(req: Request) {
     where.paymentMethod = paymentMethod;
   }
   if (cardId) where.cardId = cardId;
+  const accountId = searchParams.get("accountId");
+  if (accountId) where.accountId = accountId;
   if (category) where.category = category;
   if (from || to) {
     where.createdAt = {};
@@ -44,7 +47,7 @@ export async function GET(req: Request) {
 
   const expenses = await prisma.expense.findMany({
     where,
-    include: { card: true },
+    include: { card: true, account: { select: { id: true, name: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -109,6 +112,22 @@ export async function POST(req: Request) {
     }
   }
 
+  let accountId: string | null = null;
+  if (!cardId && body.accountId) {
+    const account = await findOwnAccount(user.id, body.accountId);
+    if (!account) {
+      return NextResponse.json({ error: "Invalid account" }, { status: 400 });
+    }
+    accountId = account.id;
+  } else if (!cardId) {
+    const accountCount = await prisma.moneyAccount.count({
+      where: { userId: user.id, isActive: true },
+    });
+    if (accountCount > 0) {
+      return NextResponse.json({ error: "Account required" }, { status: 400 });
+    }
+  }
+
   let createdAt: Date | undefined;
   if (body.createdAt != null && body.createdAt !== "") {
     const parsed = new Date(body.createdAt);
@@ -144,10 +163,11 @@ export async function POST(req: Request) {
         type,
         paymentMethod,
         cardId,
+        accountId,
         userId: user.id,
         ...(createdAt ? { createdAt } : {}),
       },
-      include: { card: true },
+      include: { card: true, account: { select: { id: true, name: true } } },
     });
 
     if (pendingId) {

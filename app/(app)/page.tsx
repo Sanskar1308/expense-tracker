@@ -51,13 +51,6 @@ export default function DashboardPage() {
     );
   }
 
-  const daysLeftGoal = summary.savings
-    ? Math.ceil(
-        (new Date(summary.savings.deadline).getTime() - Date.now()) /
-          (24 * 60 * 60 * 1000)
-      )
-    : null;
-
   return (
     <div className="space-y-4 md:space-y-6">
       <header className="flex items-end justify-between gap-3">
@@ -74,7 +67,7 @@ export default function DashboardPage() {
             )}
           </h1>
           <p className="text-sm text-stone-600 dark:text-stone-400 ">
-            Cash & UPI balance · cards separate
+            Accounts, investments, and cards
           </p>
         </div>
         <Button asChild size="sm" className="md:h-10 md:px-5">
@@ -101,15 +94,30 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Main balance</CardTitle>
+            <CardTitle>Liquid</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold md:text-3xl">
-              {formatRupee(summary.mainBalance)}
+              {formatRupee(summary.liquid ?? summary.mainBalance)}
             </p>
           </CardContent>
         </Card>
-        <Card className="col-span-2 lg:col-span-3">
+        <Card className="col-span-2 lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Net worth</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold md:text-3xl">
+              {formatRupee(summary.netWorth ?? summary.mainBalance)}
+            </p>
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+              Cash {formatRupee(summary.liquid ?? summary.mainBalance)} + investments{" "}
+              {formatRupee(summary.investmentsValue ?? 0)} − cards{" "}
+              {formatRupee(summary.cardOwed ?? 0)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="col-span-2 lg:col-span-2">
           <CardHeader>
             <CardTitle>This month</CardTitle>
           </CardHeader>
@@ -135,6 +143,28 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {!!summary.accounts?.length && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Accounts</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {summary.accounts.map((a) => (
+              <div key={a.id} className="flex justify-between text-sm">
+                <span className={a.isActive ? "" : "text-stone-400"}>{a.name}</span>
+                <span className="font-medium">{formatRupee(a.balance)}</span>
+              </div>
+            ))}
+            {(summary.unassigned ?? 0) !== 0 && (
+              <div className="flex justify-between text-sm">
+                <span>Unassigned</span>
+                <span className="font-medium">{formatRupee(summary.unassigned ?? 0)}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {(summary.upcomingDues?.length || summary.cardBills?.length) ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -240,29 +270,34 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {summary.savings && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {summary.savings.title || "Savings goal"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>
-                {formatRupee(summary.savings.mainBalance)} /{" "}
-                {formatRupee(summary.savings.targetAmount)}
-              </span>
-              <span>
-                {summary.savings.progressPct.toFixed(0)}%
-                {daysLeftGoal != null
-                  ? ` · ${daysLeftGoal}d left`
-                  : ""}
-              </span>
-            </div>
-            <Progress value={summary.savings.progressPct} />
-          </CardContent>
-        </Card>
+      {!!summary.savingsGoals?.length && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {summary.savingsGoals.map((goal) => {
+            const daysLeft = Math.ceil(
+              (new Date(goal.deadline).getTime() - Date.now()) /
+                (24 * 60 * 60 * 1000)
+            );
+            return (
+              <Card key={goal.id}>
+                <CardHeader>
+                  <CardTitle>{goal.title || "Savings goal"}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>
+                      {formatRupee(goal.savedAmount)} /{" "}
+                      {formatRupee(goal.targetAmount)}
+                    </span>
+                    <span>
+                      {goal.progressPct.toFixed(0)}% · {daysLeft}d left
+                    </span>
+                  </div>
+                  <Progress value={goal.progressPct} />
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">

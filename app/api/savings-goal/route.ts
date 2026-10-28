@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { requireUser } from "../../../lib/session-user";
-import { computeMainBalance } from "../../../lib/money";
+
+function progress(saved: number, target: number) {
+  if (!(target > 0)) return 0;
+  return Math.min(100, Math.max(0, (saved / target) * 100));
+}
 
 export async function GET() {
   const user = await requireUser();
@@ -9,33 +13,20 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [goal, rows] = await Promise.all([
-    prisma.savingsGoal.findUnique({ where: { userId: user.id } }),
-    prisma.expense.findMany({
-      where: { userId: user.id },
-      select: {
-        type: true,
-        amount: true,
-        paymentMethod: true,
-        cardId: true,
-        createdAt: true,
-        category: true,
-      },
-    }),
-  ]);
+  const goals = await prisma.savingsGoal.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: "asc" },
+  });
 
-  const mainBalance = computeMainBalance(rows);
   return NextResponse.json({
-    goal,
-    mainBalance,
-    progress:
-      goal && goal.targetAmount > 0
-        ? Math.min(100, (mainBalance / goal.targetAmount) * 100)
-        : 0,
+    goals: goals.map((g) => ({
+      ...g,
+      progress: progress(g.savedAmount, g.targetAmount),
+    })),
   });
 }
 
-export async function PUT(req: Request) {
+export async function POST(req: Request) {
   const user = await requireUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -43,24 +34,26 @@ export async function PUT(req: Request) {
 
   const body = await req.json();
   const targetAmount = parseFloat(body.targetAmount);
+  const savedAmount =
+    body.savedAmount == null || body.savedAmount === ""
+      ? 0
+      : Number(body.savedAmount);
   if (!(targetAmount > 0)) {
     return NextResponse.json({ error: "Target must be positive" }, { status: 400 });
   }
   if (!body.deadline) {
     return NextResponse.json({ error: "Deadline required" }, { status: 400 });
   }
+  if (!Number.isFinite(savedAmount) || savedAmount < 0) {
+    return NextResponse.json({ error: "Invalid saved amount" }, { status: 400 });
+  }
 
-  const goal = await prisma.savingsGoal.upsert({
-    where: { userId: user.id },
-    create: {
+  const goal = await prisma.savingsGoal.create({
+    data: {
       userId: user.id,
       title: body.title ? String(body.title).trim() : null,
       targetAmount,
-      deadline: new Date(body.deadline),
-    },
-    update: {
-      title: body.title ? String(body.title).trim() : null,
-      targetAmount,
+      savedAmount,
       deadline: new Date(body.deadline),
     },
   });

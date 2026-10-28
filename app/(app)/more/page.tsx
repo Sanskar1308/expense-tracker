@@ -1,6 +1,8 @@
 "use client";
 
 import { signOut } from "next-auth/react";
+import AccountsManager from "../../../components/more/AccountsManager";
+import InvestmentsManager from "../../../components/more/InvestmentsManager";
 import CardsManager from "../../../components/more/CardsManager";
 import BudgetsManager from "../../../components/more/BudgetsManager";
 import RecurringManager from "../../../components/more/RecurringManager";
@@ -16,7 +18,7 @@ export default function MorePage() {
           More
         </h1>
         <p className="text-sm text-stone-600 dark:text-stone-400">
-          Cards, recurring, budgets, savings, appearance, account.
+          Accounts, investments, cards, recurring, budgets, savings.
         </p>
       </header>
 
@@ -29,6 +31,9 @@ export default function MorePage() {
         </p>
         <ThemeToggle />
       </section>
+
+      <AccountsManager />
+      <InvestmentsManager />
 
       <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
         <RecurringManager />

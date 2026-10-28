@@ -11,12 +11,14 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import CategoryPicker from "../CategoryPicker";
+import AccountPicker from "../AccountPicker";
 import {
   type Expense,
   type PaymentMethod,
   type TransactionType,
 } from "../../lib/types";
 import {
+  useAccounts,
   useCards,
   useUpdateExpense,
 } from "../../hooks/useFinanceQueries";
@@ -33,6 +35,8 @@ export default function EditTransactionDialog({
   onSaved: () => void;
 }) {
   const { data: cards = [] } = useCards();
+  const { data: accountData } = useAccounts();
+  const accounts = accountData?.accounts ?? [];
   const updateExpense = useUpdateExpense();
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
@@ -40,6 +44,7 @@ export default function EditTransactionDialog({
   const [category, setCategory] = useState("OTHER");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [cardId, setCardId] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -50,6 +55,7 @@ export default function EditTransactionDialog({
     setCategory(expense.category);
     setPaymentMethod(expense.paymentMethod ?? "CASH");
     setCardId(expense.cardId ?? "");
+    setAccountId(expense.accountId ?? "");
     setError("");
   }, [expense]);
 
@@ -66,6 +72,8 @@ export default function EditTransactionDialog({
           type,
           paymentMethod: type === "CREDIT" ? null : paymentMethod,
           cardId: type === "DEBIT" && paymentMethod === "CC" ? cardId : null,
+          accountId:
+            type === "DEBIT" && paymentMethod === "CC" ? null : accountId || null,
         },
       });
       onOpenChange(false);
@@ -112,6 +120,19 @@ export default function EditTransactionDialog({
               </Button>
             ))}
           </div>
+          {accounts.some((a) => a.isActive) &&
+            (type === "CREDIT" || paymentMethod !== "CC") && (
+              <div>
+                <Label>Account</Label>
+                <div className="mt-2">
+                  <AccountPicker
+                    accounts={accounts}
+                    value={accountId}
+                    onChange={setAccountId}
+                  />
+                </div>
+              </div>
+            )}
           {type === "DEBIT" && (
             <>
               <div className="grid grid-cols-3 gap-2">

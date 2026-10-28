@@ -8,7 +8,14 @@ import {
 } from "@tanstack/react-query";
 import { apiGet, apiSend } from "../lib/api-client";
 import { moneyQueryRoots, queryKeys } from "../lib/query-keys";
-import type { CreditCard, Expense, SummaryResponse } from "../lib/types";
+import type {
+  CreditCard,
+  Expense,
+  InvestmentRow,
+  MoneyAccountRow,
+  SavingsGoalRow,
+  SummaryResponse,
+} from "../lib/types";
 
 type Pending = {
   id: string;
@@ -18,6 +25,9 @@ type Pending = {
   dueDate: string;
   status: "PENDING" | "PAID" | "SKIPPED";
   paymentMethod: string | null;
+  type?: "CREDIT" | "DEBIT";
+  investmentId?: string | null;
+  investment?: { id: string; kind: string; name: string } | null;
   paidCount: number;
   totalMonths: number | null;
 };
@@ -27,13 +37,22 @@ type RecurringRule = {
   title: string;
   amount: number;
   category: string;
+  type: "CREDIT" | "DEBIT";
   paymentMethod: string | null;
   cardId: string | null;
+  accountId: string | null;
+  investmentId: string | null;
   payee: string | null;
   dayOfMonth: number;
   totalMonths: number | null;
   isActive: boolean;
   paidCount: number;
+};
+
+type AccountsResponse = {
+  accounts: MoneyAccountRow[];
+  unassigned: number;
+  liquid: number;
 };
 
 export function useInvalidateMoney() {
@@ -70,12 +89,16 @@ export function useExpenses(filters: {
   method: string;
   category: string;
   range: "all" | "week" | "month";
+  accountId?: string;
+  cardId?: string;
 }) {
   const params = new URLSearchParams();
   if (filters.q.trim()) params.set("q", filters.q.trim());
   if (filters.type) params.set("type", filters.type);
   if (filters.method) params.set("paymentMethod", filters.method);
   if (filters.category) params.set("category", filters.category);
+  if (filters.accountId) params.set("accountId", filters.accountId);
+  if (filters.cardId) params.set("cardId", filters.cardId);
 
   const now = new Date();
   if (filters.range === "week") {
@@ -131,13 +154,7 @@ type BudgetsResponse = {
 };
 
 type SavingsGoalResponse = {
-  goal: {
-    title: string | null;
-    targetAmount: number;
-    deadline: string;
-  } | null;
-  mainBalance: number;
-  progress: number;
+  goals: SavingsGoalRow[];
 };
 
 export function useBudgets() {
@@ -151,6 +168,20 @@ export function useSavingsGoal() {
   return useQuery({
     queryKey: queryKeys.savingsGoal,
     queryFn: () => apiGet<SavingsGoalResponse>("/api/savings-goal"),
+  });
+}
+
+export function useAccounts() {
+  return useQuery({
+    queryKey: queryKeys.accounts,
+    queryFn: () => apiGet<AccountsResponse>("/api/accounts"),
+  });
+}
+
+export function useInvestments() {
+  return useQuery({
+    queryKey: queryKeys.investments,
+    queryFn: () => apiGet<InvestmentRow[]>("/api/investments"),
   });
 }
 
@@ -192,8 +223,15 @@ export function usePayPending() {
   const invalidate = useInvalidateMoney();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, paidAt }: { id: string; paidAt: string }) =>
-      apiSend(`/api/pendings/${id}/pay`, "POST", { paidAt }),
+    mutationFn: ({
+      id,
+      paidAt,
+      accountId,
+    }: {
+      id: string;
+      paidAt: string;
+      accountId?: string;
+    }) => apiSend(`/api/pendings/${id}/pay`, "POST", { paidAt, accountId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.pendings });
       invalidate();

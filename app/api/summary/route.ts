@@ -2,13 +2,19 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { requireUser } from "../../../lib/session-user";
 import {
-  computeMainBalance,
   endOfDay,
   endOfMonth,
   getMonthKey,
   startOfDay,
   startOfMonth,
 } from "../../../lib/money";
+import { ensureMoneyAccounts } from "../../../lib/accounts";
+import {
+  accountBalance,
+  cardCycleOwed,
+  roundMoney,
+  unassignedBalance,
+} from "../../../lib/balances";
 import {
   buildCategorySpend,
   buildDailySpend,
@@ -30,6 +36,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    await ensureMoneyAccounts(user.id);
     await ensurePendingsForUser(user.id);
 
     const { searchParams } = new URL(req.url);
@@ -56,7 +63,10 @@ export async function GET(req: Request) {
       last30Debits,
       heatmapDebits,
       soonPendings,
-      savingsGoal,
+      savingsGoals,
+      moneyAccounts,
+      moves,
+      investments,
     ] = await Promise.all([
       prisma.expense.findMany({
         where: { userId: user.id },
@@ -65,6 +75,7 @@ export async function GET(req: Request) {
           amount: true,
           paymentMethod: true,
           cardId: true,
+          accountId: true,
           createdAt: true,
           category: true,
         },
@@ -91,7 +102,10 @@ export async function GET(req: Request) {
       }),
       prisma.expense.findMany({
         where: { userId: user.id },
-        include: { card: true },
+        include: {
+          card: true,
+          account: { select: { id: true, name: true } },
+        },
         orderBy: { createdAt: "desc" },
         take: 5,
       }),
@@ -137,7 +151,28 @@ export async function GET(req: Request) {
         orderBy: { dueDate: "asc" },
         take: 8,
       }),
-      prisma.savingsGoal.findUnique({ where: { userId: user.id } }),
+      prisma.savingsGoal.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.moneyAccount.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.ledgerMove.findMany({
+        where: { userId: user.id },
+        select: {
+          fromAccountId: true,
+          toAccountId: true,
+          cardId: true,
+          amount: true,
+          createdAt: true,
+        },
+      }),
+      prisma.investment.findMany({
+        where: { userId: user.id },
+        select: { investedAmount: true, currentValue: true },
+      }),
     ]);
 
     const recentIds = recentRaw.map((e) => e.id);
@@ -157,7 +192,22 @@ export async function GET(req: Request) {
       pendingId: pendingByExpense.get(e.id) ?? null,
     }));
 
-    const mainBalance = computeMainBalance(allRows);
+    const accountRows = moneyAccounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      isActive: a.isActive,
+      balance: accountBalance(a, allRows, moves),
+    }));
+    const unassigned = unassignedBalance(allRows);
+    const liquid = roundMoney(
+      accountRows.reduce((sum, a) => sum + a.balance, 0) + unassigned
+    );
+    const investedTotal = roundMoney(
+      investments.reduce((sum, i) => sum + i.investedAmount, 0)
+    );
+    const investmentsValue = roundMoney(
+      investments.reduce((sum, i) => sum + i.currentValue, 0)
+    );
 
     let credited = 0;
     let spentCashUpi = 0;
@@ -211,16 +261,13 @@ export async function GET(req: Request) {
       .filter((c) => c.statementDay != null && c.dueDay != null)
       .map((c) => {
         const cycle = cardBillingCycle(c.statementDay!, c.dueDay!);
-        const owed = allRows
-          .filter(
-            (r) =>
-              r.type === "DEBIT" &&
-              r.paymentMethod === "CC" &&
-              r.cardId === c.id &&
-              r.createdAt >= cycle.cycleStart &&
-              r.createdAt <= cycle.cycleEnd
-          )
-          .reduce((s, r) => s + r.amount, 0);
+        const owed = cardCycleOwed(
+          c.id,
+          cycle.cycleStart,
+          cycle.cycleEnd,
+          allRows,
+          moves
+        );
         const daysLeft = daysUntil(cycle.dueDate);
         return {
           id: c.id,
@@ -238,10 +285,19 @@ export async function GET(req: Request) {
       soonPendings.length + cardBills.filter((b) => b.dueSoon).length;
 
     const compare = buildPeriodCompare(allRows, compareMode);
+    const cardOwed = roundMoney(cardBills.reduce((sum, b) => sum + b.owed, 0));
+    const netWorth = roundMoney(liquid + investmentsValue - cardOwed);
 
     return NextResponse.json({
       spentToday,
-      mainBalance,
+      mainBalance: liquid,
+      liquid,
+      unassigned,
+      netWorth,
+      investedTotal,
+      investmentsValue,
+      cardOwed,
+      accounts: accountRows,
       month: {
         key: month,
         credited,
@@ -274,18 +330,17 @@ export async function GET(req: Request) {
       upcomingDues: soonPendings,
       cardBills,
       compare,
-      savings: savingsGoal
-        ? {
-            title: savingsGoal.title,
-            targetAmount: savingsGoal.targetAmount,
-            deadline: savingsGoal.deadline.toISOString(),
-            mainBalance,
-            progressPct: Math.min(
-              100,
-              Math.max(0, (mainBalance / savingsGoal.targetAmount) * 100)
-            ),
-          }
-        : null,
+      savingsGoals: savingsGoals.map((g) => ({
+        id: g.id,
+        title: g.title,
+        targetAmount: g.targetAmount,
+        savedAmount: g.savedAmount,
+        deadline: g.deadline.toISOString(),
+        progressPct: Math.min(
+          100,
+          Math.max(0, (g.savedAmount / g.targetAmount) * 100)
+        ),
+      })),
     });
   } catch (err) {
     console.error("[summary]", err);

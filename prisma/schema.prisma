@@ -22,9 +22,12 @@ model User {
   creditCards   CreditCard[]
   budgets       Budget[]
   categories    Category[]
-  recurringRules RecurringRule[]
+  recurringRules  RecurringRule[]
   pendingPayments PendingPayment[]
-  savingsGoal   SavingsGoal?
+  savingsGoals    SavingsGoal[]
+  moneyAccounts   MoneyAccount[]
+  investments     Investment[]
+  ledgerMoves     LedgerMove[]
 }
 
 enum TransactionType {
@@ -48,6 +51,17 @@ enum PendingStatus {
   SKIPPED
 }
 
+enum InvestmentKind {
+  MF
+  STOCK
+  FD
+  RD
+  PPF
+  GOLD
+  SILVER
+  OTHER
+}
+
 model Category {
   id        String   @id @default(cuid())
   name      String
@@ -68,8 +82,9 @@ model CreditCard {
   dueDay       Int?
   createdAt    DateTime  @default(now())
   userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   expenses     Expense[]
+  payments     LedgerMove[]
 }
 
 model Budget {
@@ -95,6 +110,8 @@ model Expense {
   paymentMethod PaymentMethod?
   cardId        String?
   card          CreditCard?     @relation(fields: [cardId], references: [id])
+  accountId     String?
+  account       MoneyAccount?   @relation(fields: [accountId], references: [id], onDelete: SetNull)
   pendingPayment PendingPayment?
 }
 
@@ -106,6 +123,9 @@ model RecurringRule {
   type          TransactionType  @default(DEBIT)
   paymentMethod PaymentMethod?
   cardId        String?
+  accountId     String?
+  investmentId  String?
+  investment    Investment?      @relation(fields: [investmentId], references: [id], onDelete: SetNull)
   payee         String?
   cadence       RecurringCadence @default(MONTHLY)
   dayOfMonth    Int
@@ -126,6 +146,8 @@ model PendingPayment {
   type          TransactionType  @default(DEBIT)
   paymentMethod PaymentMethod?
   cardId        String?
+  accountId     String?
+  investmentId  String?
   payee         String?
   dueDate       DateTime
   status        PendingStatus    @default(PENDING)
@@ -136,6 +158,7 @@ model PendingPayment {
   userId        String
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime         @default(now())
+  move          LedgerMove?
 
   @@unique([ruleId, dueDate])
 }
@@ -144,11 +167,64 @@ model SavingsGoal {
   id           String   @id @default(cuid())
   title        String?
   targetAmount Float
+  savedAmount  Float    @default(0)
   deadline     DateTime
-  userId       String   @unique
+  userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   updatedAt    DateTime @updatedAt
   createdAt    DateTime @default(now())
+}
+
+model MoneyAccount {
+  id             String       @id @default(cuid())
+  name           String
+  openingBalance Float        @default(0)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses       Expense[]
+  movesFrom      LedgerMove[] @relation("MoveFrom")
+  movesTo        LedgerMove[] @relation("MoveTo")
+
+  @@unique([userId, name])
+}
+
+model Investment {
+  id             String           @id @default(cuid())
+  name           String
+  kind           InvestmentKind
+  investedAmount Float            @default(0)
+  currentValue   Float            @default(0)
+  grams          Float?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moves          LedgerMove[]
+  rules          RecurringRule[]
+}
+
+// Account → account, account → card bill, or account → investment (SIP / RD).
+model LedgerMove {
+  id            String         @id @default(cuid())
+  amount        Float
+  note          String?
+  createdAt     DateTime       @default(now())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromAccountId String
+  fromAccount   MoneyAccount   @relation("MoveFrom", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  toAccountId   String?
+  toAccount     MoneyAccount?  @relation("MoveTo", fields: [toAccountId], references: [id], onDelete: SetNull)
+  cardId        String?
+  card          CreditCard?    @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  investmentId  String?
+  investment    Investment?    @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  pendingId     String?        @unique
+  pending       PendingPayment? @relation(fields: [pendingId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
 }
 
 model Account {
