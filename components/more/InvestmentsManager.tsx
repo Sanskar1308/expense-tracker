@@ -6,12 +6,18 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { formatRupee } from "../../lib/utils";
 import { apiSend } from "../../lib/api-client";
-import { INVESTMENT_KINDS, type InvestmentRow } from "../../lib/types";
+import {
+  INVESTMENT_KINDS,
+  type InvestmentRow,
+  type LedgerMoveRow,
+} from "../../lib/types";
 import {
   useAccounts,
   useInvestments,
   useInvalidateMoney,
+  useMoves,
 } from "../../hooks/useFinanceQueries";
+import MoveList from "./MoveList";
 
 function kindLabel(kind: string) {
   return INVESTMENT_KINDS.find((k) => k.value === kind)?.label ?? kind;
@@ -20,6 +26,7 @@ function kindLabel(kind: string) {
 export default function InvestmentsManager() {
   const { data: rows = [] } = useInvestments();
   const { data: accountData } = useAccounts();
+  const { data: moves = [] } = useMoves();
   const invalidate = useInvalidateMoney();
   const accounts = (accountData?.accounts ?? []).filter((a) => a.isActive);
 
@@ -36,6 +43,18 @@ export default function InvestmentsManager() {
   const [error, setError] = useState("");
   const asksSchedule = kind === "MF" || kind === "RD";
   const tracksGrams = kind === "GOLD" || kind === "SILVER";
+
+  async function undoMove(id: string) {
+    setError("");
+    setMessage("");
+    try {
+      await apiSend(`/api/moves/${id}`, "DELETE");
+      setMessage("Undone");
+      await invalidate();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    }
+  }
 
   function changeKind(next: InvestmentRow["kind"]) {
     setKind(next);
@@ -91,6 +110,8 @@ export default function InvestmentsManager() {
             key={row.id}
             row={row}
             accounts={accounts}
+            moves={moves.filter((m) => m.investmentId === row.id)}
+            onUndo={undoMove}
             onChange={invalidate}
           />
         ))}
@@ -240,10 +261,14 @@ export default function InvestmentsManager() {
 function Holding({
   row,
   accounts,
+  moves,
+  onUndo,
   onChange,
 }: {
   row: InvestmentRow;
   accounts: { id: string; name: string }[];
+  moves: LedgerMoveRow[];
+  onUndo: (id: string) => Promise<void>;
   onChange: () => Promise<unknown>;
 }) {
   const [value, setValue] = useState(String(row.currentValue));
@@ -440,6 +465,7 @@ function Holding({
           </Button>
         </form>
       )}
+      <MoveList moves={moves} onUndo={(id) => void onUndo(id)} />
       {error && <p className="text-sm text-red-600">{error}</p>}
     </li>
   );

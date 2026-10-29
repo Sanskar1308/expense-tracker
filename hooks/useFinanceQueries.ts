@@ -12,6 +12,7 @@ import type {
   CreditCard,
   Expense,
   InvestmentRow,
+  LedgerMoveRow,
   MoneyAccountRow,
   SavingsGoalRow,
   SummaryResponse,
@@ -175,6 +176,13 @@ export function useAccounts() {
   return useQuery({
     queryKey: queryKeys.accounts,
     queryFn: () => apiGet<AccountsResponse>("/api/accounts"),
+  });
+}
+
+export function useMoves() {
+  return useQuery({
+    queryKey: queryKeys.moves,
+    queryFn: () => apiGet<LedgerMoveRow[]>("/api/moves"),
   });
 }
 

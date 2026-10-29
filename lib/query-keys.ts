@@ -11,6 +11,7 @@ export const queryKeys = {
   savingsGoal: ["savings-goal"] as const,
   accounts: ["accounts"] as const,
   investments: ["investments"] as const,
+  moves: ["moves"] as const,
 };
 
 /** Invalidate after money-changing actions */
@@ -23,4 +24,5 @@ export const moneyQueryRoots = [
   "accounts",
   "investments",
   "recurring",
+  "moves",
 ] as const;

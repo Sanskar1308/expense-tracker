@@ -42,6 +42,16 @@ export type SummaryCharts = {
   };
 };
 
+export type LedgerMoveRow = {
+  id: string;
+  amount: number;
+  note: string | null;
+  createdAt: string;
+  fromName: string;
+  toName: string;
+  investmentId: string | null;
+};
+
 export type MoneyAccountRow = {
   id: string;
   name: string;

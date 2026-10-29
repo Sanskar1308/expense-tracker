@@ -3,6 +3,38 @@ import { prisma } from "../../../lib/prisma";
 import { requireUser } from "../../../lib/session-user";
 import { findOwnAccount } from "../../../lib/accounts";
 
+export async function GET() {
+  const user = await requireUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // ponytail: last 30 manual moves. Dues undo covers SIP/RD. Raise the take if older moves need undo.
+  const rows = await prisma.ledgerMove.findMany({
+    where: { userId: user.id, pendingId: null },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+    include: {
+      fromAccount: { select: { name: true } },
+      toAccount: { select: { name: true } },
+      card: { select: { name: true } },
+      investment: { select: { name: true } },
+    },
+  });
+
+  return NextResponse.json(
+    rows.map((m) => ({
+      id: m.id,
+      amount: m.amount,
+      note: m.note,
+      createdAt: m.createdAt,
+      fromName: m.fromAccount.name,
+      toName: m.toAccount?.name ?? m.card?.name ?? m.investment?.name ?? "Removed",
+      investmentId: m.investmentId,
+    }))
+  );
+}
+
 export async function POST(req: Request) {
   const user = await requireUser();
   if (!user) {

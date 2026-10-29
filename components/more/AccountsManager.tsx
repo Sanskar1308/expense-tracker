@@ -6,11 +6,18 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { formatRupee } from "../../lib/utils";
 import { apiSend } from "../../lib/api-client";
-import { useAccounts, useCards, useInvalidateMoney } from "../../hooks/useFinanceQueries";
+import {
+  useAccounts,
+  useCards,
+  useInvalidateMoney,
+  useMoves,
+} from "../../hooks/useFinanceQueries";
+import MoveList from "./MoveList";
 
 export default function AccountsManager() {
   const { data } = useAccounts();
   const { data: cards = [] } = useCards();
+  const { data: moves = [] } = useMoves();
   const invalidate = useInvalidateMoney();
   const accounts = data?.accounts ?? [];
   const active = accounts.filter((a) => a.isActive);
@@ -45,6 +52,18 @@ export default function AccountsManager() {
   async function toggle(id: string, isActive: boolean) {
     await apiSend(`/api/accounts/${id}`, "PATCH", { isActive: !isActive });
     await invalidate();
+  }
+
+  async function undoMove(id: string) {
+    setError("");
+    setMessage("");
+    try {
+      await apiSend(`/api/moves/${id}`, "DELETE");
+      setMessage("Undone");
+      await invalidate();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    }
   }
 
   async function transfer(e: React.FormEvent) {
@@ -214,6 +233,11 @@ export default function AccountsManager() {
           </div>
         </form>
       )}
+
+      <MoveList
+        moves={moves.filter((m) => !m.investmentId)}
+        onUndo={undoMove}
+      />
 
       {message && <p className="text-sm text-emerald-700">{message}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
