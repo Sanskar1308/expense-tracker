@@ -11,6 +11,7 @@ import UndoToast from "../../../components/UndoToast";
 import { DEFAULT_CATEGORIES } from "../../../lib/categories";
 import {
   type Expense,
+  type LedgerMoveRow,
   type PaymentMethod,
   type TransactionType,
 } from "../../../lib/types";
@@ -22,8 +23,23 @@ import {
   useDeleteExpense,
   useExpenses,
   useInvalidateMoney,
+  useMoves,
   useRepeatExpense,
 } from "../../../hooks/useFinanceQueries";
+
+function cardPaymentExpense(move: LedgerMoveRow): Expense {
+  return {
+    id: move.id,
+    title: `${move.toName} bill`,
+    amount: move.amount,
+    createdAt: move.createdAt,
+    category: "Card bill",
+    type: "DEBIT",
+    paymentMethod: null,
+    cardId: move.cardId ?? null,
+    account: { id: move.fromAccountId ?? "", name: move.fromName },
+  };
+}
 
 export default function ActivityPage() {
   const [q, setQ] = useState("");
@@ -54,6 +70,7 @@ export default function ActivityPage() {
   };
 
   const { data: expenses = [], isPending } = useExpenses(filters);
+  const { data: moves = [] } = useMoves();
   const { data: accountData } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: categories = DEFAULT_CATEGORIES.map((c) => ({
@@ -69,6 +86,12 @@ export default function ActivityPage() {
     await repeatMutation.mutateAsync(id);
     setToast("Added for today");
     setTimeout(() => setToast(""), 2000);
+  }
+
+  async function removeMove(id: string) {
+    if (!confirm("Undo this card payment?")) return;
+    await apiSend(`/api/moves/${id}`, "DELETE");
+    await createExpense();
   }
 
   async function remove(id: string) {
@@ -98,6 +121,45 @@ export default function ActivityPage() {
     });
     await createExpense();
   }
+
+  const rangeStart =
+    range === "week"
+      ? new Date(
+          new Date().setDate(new Date().getDate() - ((new Date().getDay() + 6) % 7))
+        )
+      : range === "month"
+        ? new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        : null;
+  if (rangeStart) rangeStart.setHours(0, 0, 0, 0);
+  const search = debouncedQ.trim().toLowerCase();
+  const cardPays = moves.filter((m) => {
+    if (!m.cardId) return false;
+    if (type === "CREDIT" || method === "CASH" || method === "UPI" || category) {
+      return false;
+    }
+    if (cardId && m.cardId !== cardId) return false;
+    if (accountId && m.fromAccountId !== accountId) return false;
+    if (rangeStart && new Date(m.createdAt) < rangeStart) return false;
+    if (
+      search &&
+      !`${m.toName} ${m.fromName} bill`.toLowerCase().includes(search)
+    ) {
+      return false;
+    }
+    return true;
+  });
+  const rows = [
+    ...expenses.map((expense) => ({
+      kind: "expense" as const,
+      at: expense.createdAt,
+      expense,
+    })),
+    ...cardPays.map((move) => ({
+      kind: "pay" as const,
+      at: move.createdAt,
+      move,
+    })),
+  ].sort((a, b) => +new Date(b.at) - +new Date(a.at));
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -243,20 +305,32 @@ export default function ActivityPage() {
             <p className="py-8 text-center text-sm text-stone-500 dark:text-stone-400">
               Loading…
             </p>
-          ) : expenses.length === 0 ? (
+          ) : rows.length === 0 ? (
             <p className="py-8 text-center text-sm text-stone-500 dark:text-stone-400">
               No matching transactions.
             </p>
           ) : (
-            expenses.map((e) => (
-              <TransactionRow
-                key={e.id}
-                expense={e}
-                onRepeat={e.fromPending ? undefined : () => repeat(e.id)}
-                onEdit={() => setEditing(e)}
-                onDelete={() => remove(e.id)}
-              />
-            ))
+            rows.map((row) =>
+              row.kind === "expense" ? (
+                <TransactionRow
+                  key={row.expense.id}
+                  expense={row.expense}
+                  onRepeat={
+                    row.expense.fromPending
+                      ? undefined
+                      : () => repeat(row.expense.id)
+                  }
+                  onEdit={() => setEditing(row.expense)}
+                  onDelete={() => remove(row.expense.id)}
+                />
+              ) : (
+                <TransactionRow
+                  key={row.move.id}
+                  expense={cardPaymentExpense(row.move)}
+                  onDelete={() => removeMove(row.move.id)}
+                />
+              )
+            )
           )}
         </div>
       </div>

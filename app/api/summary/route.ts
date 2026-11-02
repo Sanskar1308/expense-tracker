@@ -11,7 +11,7 @@ import {
 import { ensureMoneyAccounts } from "../../../lib/accounts";
 import {
   accountBalance,
-  cardCycleOwed,
+  cardBillParts,
   roundMoney,
   unassignedBalance,
 } from "../../../lib/balances";
@@ -26,6 +26,7 @@ import {
   buildPeriodCompare,
   cardBillingCycle,
   daysUntil,
+  nextOnOrAfter,
   ensurePendingsForUser,
 } from "../../../lib/dues";
 
@@ -167,6 +168,7 @@ export async function GET(req: Request) {
           cardId: true,
           amount: true,
           createdAt: true,
+          note: true,
         },
       }),
       prisma.investment.findMany({
@@ -259,26 +261,61 @@ export async function GET(req: Request) {
 
     const cardBills = cards
       .filter((c) => c.statementDay != null && c.dueDay != null)
-      .map((c) => {
+      .flatMap((c) => {
         const cycle = cardBillingCycle(c.statementDay!, c.dueDay!);
-        const owed = cardCycleOwed(
+        const parts = cardBillParts(
           c.id,
-          cycle.cycleStart,
-          cycle.cycleEnd,
+          cycle.prevStatement,
+          cycle.statementDate,
+          cycle.nextStatement,
           allRows,
           moves
         );
-        const daysLeft = daysUntil(cycle.dueDate);
-        return {
+        const rows: {
+          id: string;
+          cardId: string;
+          cycleKey: string;
+          name: string;
+          last4: string | null;
+          owed: number;
+          paid: number;
+          dueDate: string;
+          cycleStart: string;
+          daysLeft: number;
+          dueSoon: boolean;
+        }[] = [];
+        if (parts.closed > 0) {
+          const daysLeft = daysUntil(cycle.dueDate);
+          rows.push({
+            id: `${c.id}-closed`,
+            cardId: c.id,
+            cycleKey: parts.closedKey,
+            name: c.name,
+            last4: c.last4,
+            owed: parts.closed,
+            paid: parts.closedPaid,
+            dueDate: cycle.dueDate.toISOString(),
+            cycleStart: cycle.prevStatement.toISOString(),
+            daysLeft,
+            dueSoon: daysLeft >= 0 && daysLeft <= 3,
+          });
+        }
+        const due = nextOnOrAfter(cycle.nextStatement, c.dueDay!);
+        const daysLeft = daysUntil(due);
+        rows.push({
           id: c.id,
+          cardId: c.id,
+          cycleKey: parts.openKey,
           name: c.name,
           last4: c.last4,
-          owed: Math.round(owed * 100) / 100,
-          dueDate: cycle.dueDate.toISOString(),
-          cycleStart: cycle.cycleStart.toISOString(),
+          owed: parts.open,
+          paid: parts.openPaid,
+          dueDate: due.toISOString(),
+          cycleStart: cycle.statementDate.toISOString(),
           daysLeft,
-          dueSoon: daysLeft >= 0 && daysLeft <= 3,
-        };
+          dueSoon: parts.open > 0 && daysLeft >= 0 && daysLeft <= 3,
+        });
+        return rows;
       });
 
     const duesBadge =

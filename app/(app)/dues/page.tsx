@@ -14,15 +14,21 @@ import {
 } from "../../../components/ui/dialog";
 import UndoToast from "../../../components/UndoToast";
 import { formatRupee } from "../../../lib/utils";
+import { apiSend } from "../../../lib/api-client";
 import { calendarKey, formatDueDate } from "../../../lib/due-dates";
 import AccountPicker from "../../../components/AccountPicker";
+import type { SummaryResponse } from "../../../lib/types";
 import {
   useAccounts,
+  useInvalidateMoney,
   usePayPending,
   usePendings,
   useSkipPending,
+  useSummary,
   useUndoPayPending,
 } from "../../../hooks/useFinanceQueries";
+
+type CardBill = NonNullable<SummaryResponse["cardBills"]>[number];
 
 type Pending = {
   id: string;
@@ -45,25 +51,41 @@ function toDateInputValue(d: Date) {
 
 export default function DuesPage() {
   const { data: items = [], isPending } = usePendings();
+  const { data: summary, isPending: summaryPending } = useSummary();
   const { data: accountData } = useAccounts();
   const accounts = (accountData?.accounts ?? []).filter((a) => a.isActive);
+  const invalidate = useInvalidateMoney();
   const payMutation = usePayPending();
   const skipMutation = useSkipPending();
   const undoMutation = useUndoPayPending();
 
-  const [undo, setUndo] = useState<{ id: string } | null>(null);
+  const [undo, setUndo] = useState<{ kind: "pending" | "move"; id: string } | null>(
+    null
+  );
   const [paying, setPaying] = useState<Pending | null>(null);
+  const [cardPay, setCardPay] = useState<CardBill | null>(null);
+  const [payAmount, setPayAmount] = useState("");
   const [payAccountId, setPayAccountId] = useState("");
   const [payError, setPayError] = useState("");
+  const [savingCard, setSavingCard] = useState(false);
   const [dateMode, setDateMode] = useState<"today" | "custom">("today");
   const [customDate, setCustomDate] = useState("");
 
   function openPay(p: Pending) {
+    setCardPay(null);
     setPaying(p);
     setPayError("");
     setPayAccountId(accounts.length === 1 ? accounts[0].id : "");
     setDateMode("today");
     setCustomDate(toDateInputValue(new Date(p.dueDate)));
+  }
+
+  function openCardPay(bill: CardBill) {
+    setPaying(null);
+    setCardPay(bill);
+    setPayError("");
+    setPayAmount(bill.owed > 0 ? String(bill.owed) : "");
+    setPayAccountId(accounts.length === 1 ? accounts[0].id : "");
   }
 
   async function confirmPay() {
@@ -86,10 +108,42 @@ export default function DuesPage() {
       });
       const id = paying.id;
       setPaying(null);
-      setUndo({ id });
+      setUndo({ kind: "pending", id });
       setTimeout(() => setUndo((u) => (u?.id === id ? null : u)), 8000);
     } catch (err) {
       setPayError(err instanceof Error ? err.message : "Could not mark paid");
+    }
+  }
+
+  async function confirmCardPay() {
+    if (!cardPay) return;
+    const amount = parseFloat(payAmount);
+    if (!(amount > 0)) {
+      setPayError("Enter an amount");
+      return;
+    }
+    if (!payAccountId) {
+      setPayError("Pick an account");
+      return;
+    }
+    setSavingCard(true);
+    setPayError("");
+    try {
+      const move = await apiSend<{ id: string }>("/api/moves", "POST", {
+        fromAccountId: payAccountId,
+        cardId: cardPay.cardId ?? cardPay.id,
+        amount,
+        note: cardPay.cycleKey ? `cycle:${cardPay.cycleKey}` : null,
+      });
+      const id = move.id;
+      setCardPay(null);
+      await invalidate();
+      setUndo({ kind: "move", id });
+      setTimeout(() => setUndo((u) => (u?.id === id ? null : u)), 8000);
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : "Could not mark paid");
+    } finally {
+      setSavingCard(false);
     }
   }
 
@@ -101,7 +155,20 @@ export default function DuesPage() {
     await undoMutation.mutateAsync(id);
   }
 
+  async function undoLast() {
+    if (!undo) return;
+    const current = undo;
+    setUndo(null);
+    if (current.kind === "move") {
+      await apiSend(`/api/moves/${current.id}`, "DELETE");
+      await invalidate();
+      return;
+    }
+    await undoPay(current.id);
+  }
+
   const pending = items.filter((i) => i.status === "PENDING");
+  const cardBills = summary?.cardBills ?? [];
   const done = items.filter((i) => i.status !== "PENDING").slice(0, 10);
 
   return (
@@ -124,16 +191,44 @@ export default function DuesPage() {
         <h2 className="pt-3 text-sm font-medium text-stone-600 dark:text-stone-400">
           Pending
         </h2>
-        {isPending ? (
+        {isPending || (summaryPending && !summary) ? (
           <p className="py-8 text-center text-sm text-stone-500 dark:text-stone-400">
             Loading…
           </p>
-        ) : pending.length === 0 ? (
+        ) : pending.length === 0 && cardBills.length === 0 ? (
           <p className="py-8 text-center text-sm text-stone-500 dark:text-stone-400">
             No pending dues. Add a recurring rule in More.
           </p>
         ) : (
-          pending.map((p) => (
+          <>
+          {cardBills.map((b) => (
+            <div
+              key={b.id}
+              className="flex flex-wrap items-start justify-between gap-3 border-b border-stone-100 py-3 last:border-0 dark:border-stone-800"
+            >
+              <div className="min-w-0 space-y-1">
+                <p className="font-medium text-stone-900 dark:text-stone-100">
+                  {b.name}
+                  {b.last4 ? ` · ${b.last4}` : ""}
+                </p>
+                <div className="flex flex-wrap gap-1.5 text-xs text-stone-500 dark:text-stone-400">
+                  <Badge>Card</Badge>
+                  {b.cycleStart && (
+                    <span>From {formatDueDate(b.cycleStart)}</span>
+                  )}
+                  <span>Due {formatDueDate(b.dueDate)}</span>
+                  {(b.paid ?? 0) > 0 && <span>Paid {formatRupee(b.paid ?? 0)}</span>}
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <p className="font-semibold">{formatRupee(b.owed)}</p>
+                <Button size="sm" type="button" onClick={() => openCardPay(b)}>
+                  Paid
+                </Button>
+              </div>
+            </div>
+          ))}
+          {pending.map((p) => (
             <div
               key={p.id}
               className="flex flex-wrap items-start justify-between gap-3 border-b border-stone-100 py-3 last:border-0 dark:border-stone-800"
@@ -188,7 +283,8 @@ export default function DuesPage() {
                 </div>
               </div>
             </div>
-          ))
+          ))}
+          </>
         )}
       </section>
 
@@ -213,43 +309,69 @@ export default function DuesPage() {
       )}
 
       <Dialog
-        open={!!paying}
+        open={!!paying || !!cardPay}
         onOpenChange={(open) => {
-          if (!open) setPaying(null);
+          if (!open) {
+            setPaying(null);
+            setCardPay(null);
+          }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mark as paid</DialogTitle>
+            <DialogTitle>{cardPay ? "Pay card bill" : "Mark as paid"}</DialogTitle>
             <p className="text-sm text-stone-600 dark:text-stone-400">
-              {paying?.title} · {paying ? formatRupee(paying.amount) : ""}
+              {cardPay
+                ? `${cardPay.name} · bill ${formatRupee(cardPay.owed)}`
+                : `${paying?.title ?? ""} · ${paying ? formatRupee(paying.amount) : ""}`}
             </p>
           </DialogHeader>
 
           <div className="space-y-3">
-            <p className="text-sm font-medium text-stone-800 dark:text-stone-200">
-              Payment date
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={dateMode === "today" ? "default" : "outline"}
-                onClick={() => setDateMode("today")}
-              >
-                Today
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={dateMode === "custom" ? "default" : "outline"}
-                onClick={() => setDateMode("custom")}
-              >
-                Change date
-              </Button>
-            </div>
+            {cardPay && (
+              <div>
+                <Label htmlFor="pay-amount">Amount</Label>
+                <Input
+                  id="pay-amount"
+                  className="mt-1"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                  Type what you are paying. You can pay this cycle before the due date.
+                </p>
+              </div>
+            )}
+            {!cardPay && (
+              <>
+                <p className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                  Payment date
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={dateMode === "today" ? "default" : "outline"}
+                    onClick={() => setDateMode("today")}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={dateMode === "custom" ? "default" : "outline"}
+                    onClick={() => setDateMode("custom")}
+                  >
+                    Change date
+                  </Button>
+                </div>
+              </>
+            )}
 
-            {paying?.paymentMethod !== "CC" && (
+            {(cardPay || paying?.paymentMethod !== "CC") && (
               <div>
                 <Label>
                   {paying?.type === "CREDIT" && !paying.investmentId
@@ -272,7 +394,7 @@ export default function DuesPage() {
               </div>
             )}
 
-            {dateMode === "custom" && (
+            {!cardPay && dateMode === "custom" && (
               <div>
                 <Label htmlFor="paid-at">Date</Label>
                 <Input
@@ -294,21 +416,27 @@ export default function DuesPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setPaying(null)}
-                disabled={payMutation.isPending}
+                onClick={() => {
+                  setPaying(null);
+                  setCardPay(null);
+                }}
+                disabled={payMutation.isPending || savingCard}
               >
                 Cancel
               </Button>
               <Button
                 type="button"
-                onClick={() => void confirmPay()}
+                onClick={() => void (cardPay ? confirmCardPay() : confirmPay())}
                 disabled={
                   payMutation.isPending ||
-                  (dateMode === "custom" && !customDate) ||
-                  (paying?.paymentMethod !== "CC" && !payAccountId)
+                  savingCard ||
+                  (cardPay
+                    ? !(parseFloat(payAmount) > 0) || !payAccountId
+                    : (dateMode === "custom" && !customDate) ||
+                      (paying?.paymentMethod !== "CC" && !payAccountId))
                 }
               >
-                {payMutation.isPending ? "Saving…" : "Confirm"}
+                {payMutation.isPending || savingCard ? "Saving…" : "Confirm"}
               </Button>
             </div>
           </div>
@@ -318,7 +446,7 @@ export default function DuesPage() {
       {undo && (
         <UndoToast
           message="Marked as paid"
-          onUndo={() => undoPay(undo.id)}
+          onUndo={() => void undoLast()}
           onDismiss={() => setUndo(null)}
         />
       )}

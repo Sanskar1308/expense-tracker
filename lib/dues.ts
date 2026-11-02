@@ -4,7 +4,6 @@ import { categoryLabel } from "./analytics";
 import {
   addMonths,
   calendarKey,
-  dateForDayInMonth,
   dueDatesForRule,
   lastOnOrBefore,
   nextOnOrAfter,
@@ -133,21 +132,16 @@ export function cardBillingCycle(
   dueDay: number,
   now = new Date()
 ) {
-  const cycleStart = lastOnOrBefore(now, statementDay);
-  const dueDate = nextOnOrAfter(cycleStart, dueDay);
-  let due = dueDate;
-  if (due < cycleStart) {
-    due = nextOnOrAfter(addMonths(cycleStart, 0), dueDay);
-    if (due < cycleStart) due = addMonths(due, 1);
-  }
-  if (due < cycleStart) {
-    const { year, monthIndex } = ymdInZone(cycleStart);
-    due = dateForDayInMonth(year, monthIndex, dueDay);
-    if (due < cycleStart) {
-      due = dateForDayInMonth(year, monthIndex + 1, dueDay);
-    }
-  }
-  return { cycleStart, dueDate: due, cycleEnd: endOfDay(now) };
+  const statementDate = lastOnOrBefore(now, statementDay);
+  // Due day after this statement. A 15th statement with due on the 5th bills next month.
+  const dueDate = nextOnOrAfter(statementDate, dueDay);
+  return {
+    statementDate,
+    prevStatement: addMonths(statementDate, -1),
+    nextStatement: addMonths(statementDate, 1),
+    dueDate,
+    cycleStart: statementDate,
+  };
 }
 
 export function buildPeriodCompare(

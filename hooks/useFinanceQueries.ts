@@ -72,7 +72,7 @@ export function useSummary(compare: "week" | "month" = "month") {
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     placeholderData: keepPreviousData,
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
 }

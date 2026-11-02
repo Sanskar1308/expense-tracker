@@ -166,7 +166,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {(summary.upcomingDues?.length || summary.cardBills?.length) ? (
+      {(summary.upcomingDues?.length || summary.cardBills?.some((b) => b.owed > 0)) ? (
         <div className="grid gap-4 md:grid-cols-2">
           {!!summary.upcomingDues?.length && (
             <Card>
@@ -191,13 +191,13 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           )}
-          {!!summary.cardBills?.length && (
+          {!!summary.cardBills?.some((b) => b.owed > 0) && (
             <Card>
               <CardHeader>
                 <CardTitle>Card bills</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                {summary.cardBills.map((b) => (
+                {summary.cardBills?.filter((b) => b.owed > 0).map((b) => (
                   <div key={b.id} className="flex justify-between gap-2">
                     <span>
                       {b.name}

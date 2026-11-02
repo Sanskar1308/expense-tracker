@@ -48,7 +48,9 @@ export type LedgerMoveRow = {
   note: string | null;
   createdAt: string;
   fromName: string;
+  fromAccountId?: string;
   toName: string;
+  cardId?: string | null;
   investmentId: string | null;
 };
 
@@ -131,10 +133,14 @@ export type SummaryResponse = {
   }[];
   cardBills?: {
     id: string;
+    cardId?: string;
+    cycleKey?: string;
     name: string;
     last4: string | null;
     owed: number;
+    paid?: number;
     dueDate: string;
+    cycleStart?: string;
     daysLeft: number;
     dueSoon: boolean;
   }[];

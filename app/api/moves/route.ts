@@ -29,7 +29,9 @@ export async function GET() {
       note: m.note,
       createdAt: m.createdAt,
       fromName: m.fromAccount.name,
+      fromAccountId: m.fromAccountId,
       toName: m.toAccount?.name ?? m.card?.name ?? m.investment?.name ?? "Removed",
+      cardId: m.cardId,
       investmentId: m.investmentId,
     }))
   );
