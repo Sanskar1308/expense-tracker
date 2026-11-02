@@ -149,7 +149,7 @@ model PendingPayment {
   accountId     String?
   investmentId  String?
   payee         String?
-  dueDate       DateTime
+  dueDate       DateTime?
   status        PendingStatus    @default(PENDING)
   expenseId     String?          @unique
   expense       Expense?         @relation(fields: [expenseId], references: [id], onDelete: SetNull)
@@ -210,6 +210,7 @@ model LedgerMove {
   id            String         @id @default(cuid())
   amount        Float
   note          String?
+  grams         Float?
   createdAt     DateTime       @default(now())
   userId        String
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)

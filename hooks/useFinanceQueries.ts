@@ -23,7 +23,8 @@ type Pending = {
   title: string;
   amount: number;
   payee: string | null;
-  dueDate: string;
+  dueDate: string | null;
+  category?: string;
   status: "PENDING" | "PAID" | "SKIPPED";
   paymentMethod: string | null;
   type?: "CREDIT" | "DEBIT";

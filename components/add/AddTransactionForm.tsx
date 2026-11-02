@@ -6,7 +6,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import CategoryPicker from "../CategoryPicker";
-import AccountPicker from "../AccountPicker";
+import AccountPicker, { accountsForMethod } from "../AccountPicker";
 import {
   COMMON_TITLES,
   type PaymentMethod,
@@ -43,9 +43,17 @@ export default function AddTransactionForm({
     ? accountData.accounts
     : [];
   const createExpense = useCreateExpense();
-  const activeAccounts = accounts.filter((a) => a.isActive);
+  const methodForAccount = type === "DEBIT" ? paymentMethod : null;
+  const activeAccounts = accountsForMethod(accounts, methodForAccount);
+  const cashAccount = accountsForMethod(accounts, "CASH").find(
+    (a) => a.name === "Cash"
+  );
   const selectedAccountId =
-    accountId || activeAccounts[0]?.id || "";
+    (activeAccounts.some((a) => a.id === accountId) ? accountId : "") ||
+    (paymentMethod === "CASH" && type === "DEBIT" && cashAccount
+      ? cashAccount.id
+      : activeAccounts[0]?.id) ||
+    "";
 
   useEffect(() => {
     amountRef.current?.focus();
@@ -79,7 +87,7 @@ export default function AddTransactionForm({
       };
 
       const needsAccount =
-        activeAccounts.length > 0 &&
+        accountsForMethod(accounts, methodForAccount).length > 0 &&
         !(type === "DEBIT" && paymentMethod === "CC");
       if (needsAccount && !selectedAccountId) {
         setMessage("Pick an account.");
@@ -88,6 +96,10 @@ export default function AddTransactionForm({
 
       if (type === "DEBIT" && paymentMethod === "CC" && !cardId) {
         setMessage("Add a card in More, or pick one.");
+        return;
+      }
+      if (type === "DEBIT" && paymentMethod === "UPI" && !selectedAccountId) {
+        setMessage("UPI needs a bank account. Cash is only for cash.");
         return;
       }
 
@@ -185,6 +197,12 @@ export default function AddTransactionForm({
         </div>
       </div>
 
+      {type === "DEBIT" && paymentMethod === "UPI" && activeAccounts.length === 0 && (
+        <p className="text-sm text-stone-600 dark:text-stone-400">
+          UPI needs a bank account. Cash is only for cash.
+        </p>
+      )}
+
       {activeAccounts.length > 0 &&
         (type === "CREDIT" || paymentMethod !== "CC") && (
           <div className="space-y-2">
@@ -206,7 +224,12 @@ export default function AddTransactionForm({
                 key={m}
                 type="button"
                 variant={paymentMethod === m ? "default" : "outline"}
-                onClick={() => setPaymentMethod(m)}
+                onClick={() => {
+                  setPaymentMethod(m);
+                  if ((m === "UPI" || m === "CC") && accountId === cashAccount?.id) {
+                    setAccountId("");
+                  }
+                }}
               >
                 {m === "CC" ? "Card" : m === "CASH" ? "Cash" : "UPI"}
               </Button>

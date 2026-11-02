@@ -6,6 +6,7 @@ import { Input } from "../../../components/ui/input";
 import { Button } from "../../../components/ui/button";
 import { Label } from "../../../components/ui/label";
 import TransactionRow from "../../../components/TransactionRow";
+import { accountsForPicker } from "../../../components/AccountPicker";
 import EditTransactionDialog from "../../../components/activity/EditTransactionDialog";
 import UndoToast from "../../../components/UndoToast";
 import { DEFAULT_CATEGORIES } from "../../../lib/categories";
@@ -254,7 +255,7 @@ export default function ActivityPage() {
               onChange={(e) => setAccountId(e.target.value)}
             >
               <option value="">Any account</option>
-              {(accountData?.accounts ?? []).map((a) => (
+              {accountsForPicker(accountData?.accounts ?? []).map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>

@@ -36,6 +36,7 @@ async function normalizePendingsForRule(ruleId: string) {
   });
   const groups = new Map<string, typeof rows>();
   for (const row of rows) {
+    if (!row.dueDate) continue;
     const key = calendarKey(row.dueDate);
     const list = groups.get(key) ?? [];
     list.push(row);
@@ -54,6 +55,7 @@ async function normalizePendingsForRule(ruleId: string) {
       });
     }
 
+    if (!keeper.dueDate) continue;
     const { year, monthIndex, day } = ymdInZone(keeper.dueDate);
     const normalized = utcNoon(year, monthIndex, day);
     if (keeper.dueDate.getTime() !== normalized.getTime()) {
@@ -74,7 +76,7 @@ export async function ensurePendingsForUser(userId: string) {
     await normalizePendingsForRule(rule.id);
   }
 
-  const rules = allRules.filter((r) => r.isActive);
+  const rules = allRules.filter((r) => r.isActive && r.category !== "DUE");
 
   for (const rule of rules) {
     const paidCount = await prisma.pendingPayment.count({

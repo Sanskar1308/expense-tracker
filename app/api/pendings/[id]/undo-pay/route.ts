@@ -50,10 +50,12 @@ export async function POST(_req: Request, { params }: Params) {
       where: { id },
       data: { status: "PENDING", expenseId: null },
     });
-    await tx.recurringRule.update({
-      where: { id: pending.ruleId },
-      data: { isActive: true },
-    });
+    if (pending.category !== "DUE") {
+      await tx.recurringRule.update({
+        where: { id: pending.ruleId },
+        data: { isActive: true },
+      });
+    }
     return updated;
   });
 

@@ -16,6 +16,7 @@ function startOfLocalDay(d: Date): Date {
 }
 
 export function categoryLabel(value: string): string {
+  if (value === "DUE") return "Due";
   return DEFAULT_CATEGORIES.find((c) => c.value === value)?.label ?? value;
 }
 

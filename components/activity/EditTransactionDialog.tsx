@@ -11,7 +11,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import CategoryPicker from "../CategoryPicker";
-import AccountPicker from "../AccountPicker";
+import AccountPicker, { accountsForMethod } from "../AccountPicker";
 import {
   type Expense,
   type PaymentMethod,
@@ -46,6 +46,10 @@ export default function EditTransactionDialog({
   const [cardId, setCardId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [error, setError] = useState("");
+  const pickerAccounts = accountsForMethod(
+    accounts,
+    type === "DEBIT" ? paymentMethod : null
+  );
 
   useEffect(() => {
     if (!expense) return;
@@ -73,7 +77,11 @@ export default function EditTransactionDialog({
           paymentMethod: type === "CREDIT" ? null : paymentMethod,
           cardId: type === "DEBIT" && paymentMethod === "CC" ? cardId : null,
           accountId:
-            type === "DEBIT" && paymentMethod === "CC" ? null : accountId || null,
+            type === "DEBIT" && paymentMethod === "CC"
+              ? null
+              : pickerAccounts.some((a) => a.id === accountId)
+                ? accountId
+                : pickerAccounts[0]?.id ?? null,
         },
       });
       onOpenChange(false);
@@ -120,14 +128,18 @@ export default function EditTransactionDialog({
               </Button>
             ))}
           </div>
-          {accounts.some((a) => a.isActive) &&
+          {pickerAccounts.length > 0 &&
             (type === "CREDIT" || paymentMethod !== "CC") && (
               <div>
                 <Label>Account</Label>
                 <div className="mt-2">
                   <AccountPicker
-                    accounts={accounts}
-                    value={accountId}
+                    accounts={pickerAccounts}
+                    value={
+                      pickerAccounts.some((a) => a.id === accountId)
+                        ? accountId
+                        : pickerAccounts[0]?.id ?? ""
+                    }
                     onChange={setAccountId}
                   />
                 </div>
@@ -142,7 +154,15 @@ export default function EditTransactionDialog({
                     type="button"
                     size="sm"
                     variant={paymentMethod === m ? "default" : "outline"}
-                    onClick={() => setPaymentMethod(m)}
+                    onClick={() => {
+                      setPaymentMethod(m);
+                      if (
+                        (m === "UPI" || m === "CC") &&
+                        accounts.find((a) => a.id === accountId)?.name === "Cash"
+                      ) {
+                        setAccountId("");
+                      }
+                    }}
                   >
                     {m}
                   </Button>

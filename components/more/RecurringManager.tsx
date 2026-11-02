@@ -6,7 +6,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import CategoryPicker from "../CategoryPicker";
-import AccountPicker from "../AccountPicker";
+import AccountPicker, { accountsForMethod } from "../AccountPicker";
 import type { PaymentMethod } from "../../lib/types";
 import { formatRupee } from "../../lib/utils";
 import { apiSend } from "../../lib/api-client";
@@ -42,12 +42,15 @@ export default function RecurringManager() {
   const [totalMonths, setTotalMonths] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const pickerAccounts = accountsForMethod(
+    accounts,
+    kind === "spend" ? method : null
+  );
 
   useEffect(() => {
-    if (accountId) return;
-    const first = accounts.find((a) => a.isActive);
-    if (first) setAccountId(first.id);
-  }, [accounts, accountId]);
+    if (pickerAccounts.some((a) => a.id === accountId)) return;
+    if (pickerAccounts[0]) setAccountId(pickerAccounts[0].id);
+  }, [pickerAccounts, accountId]);
 
   async function refresh() {
     await Promise.all([
@@ -69,7 +72,12 @@ export default function RecurringManager() {
         category,
         paymentMethod: kind === "spend" ? method : null,
         cardId: kind === "spend" && method === "CC" ? cardId : null,
-        accountId: kind === "spend" && method === "CC" ? null : accountId,
+        accountId:
+          kind === "spend" && method === "CC"
+            ? null
+            : pickerAccounts.some((a) => a.id === accountId)
+              ? accountId
+              : pickerAccounts[0]?.id ?? null,
         investmentId: kind === "invest" ? investmentId : null,
         payee: payee || null,
         dayOfMonth: parseInt(dayOfMonth, 10),
@@ -207,11 +215,17 @@ export default function RecurringManager() {
           <div>
             <Label>{kind === "income" ? "Into account" : "From account"}</Label>
             <div className="mt-2">
-              <AccountPicker
-                accounts={accounts}
-                value={accountId}
-                onChange={setAccountId}
-              />
+              {kind === "spend" && method === "UPI" && pickerAccounts.length === 0 ? (
+                <p className="text-sm text-stone-600 dark:text-stone-400">
+                  UPI needs a bank account. Cash is only for cash.
+                </p>
+              ) : (
+                <AccountPicker
+                  accounts={pickerAccounts}
+                  value={accountId}
+                  onChange={setAccountId}
+                />
+              )}
             </div>
           </div>
         )}

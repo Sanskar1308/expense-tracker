@@ -1,0 +1,1 @@
+ALTER TABLE "PendingPayment" ALTER COLUMN "dueDate" DROP NOT NULL;

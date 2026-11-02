@@ -27,10 +27,13 @@ export async function DELETE(_req: Request, { params }: Params) {
         // ponytail: subtract this add even if the value was edited after
         await tx.investment.update({
           where: { id: inv.id },
-          data: {
-            investedAmount: Math.max(0, inv.investedAmount - move.amount),
-            currentValue: Math.max(0, inv.currentValue - move.amount),
-          },
+            data: {
+              investedAmount: Math.max(0, inv.investedAmount - move.amount),
+              currentValue: Math.max(0, inv.currentValue - move.amount),
+              ...(move.grams
+                ? { grams: Math.max(0, (inv.grams ?? 0) - move.grams) }
+                : {}),
+            },
         });
       }
     }

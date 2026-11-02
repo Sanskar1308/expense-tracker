@@ -16,7 +16,10 @@ import UndoToast from "../../../components/UndoToast";
 import { formatRupee } from "../../../lib/utils";
 import { apiSend } from "../../../lib/api-client";
 import { calendarKey, formatDueDate } from "../../../lib/due-dates";
-import AccountPicker from "../../../components/AccountPicker";
+import AccountPicker, {
+  accountsForMethod,
+  accountsForPicker,
+} from "../../../components/AccountPicker";
 import type { SummaryResponse } from "../../../lib/types";
 import {
   useAccounts,
@@ -35,7 +38,8 @@ type Pending = {
   title: string;
   amount: number;
   payee: string | null;
-  dueDate: string;
+  dueDate: string | null;
+  category?: string;
   status: "PENDING" | "PAID" | "SKIPPED";
   paymentMethod: string | null;
   type?: "CREDIT" | "DEBIT";
@@ -53,7 +57,7 @@ export default function DuesPage() {
   const { data: items = [], isPending } = usePendings();
   const { data: summary, isPending: summaryPending } = useSummary();
   const { data: accountData } = useAccounts();
-  const accounts = (accountData?.accounts ?? []).filter((a) => a.isActive);
+  const accounts = accountsForPicker(accountData?.accounts ?? []);
   const invalidate = useInvalidateMoney();
   const payMutation = usePayPending();
   const skipMutation = useSkipPending();
@@ -70,14 +74,23 @@ export default function DuesPage() {
   const [savingCard, setSavingCard] = useState(false);
   const [dateMode, setDateMode] = useState<"today" | "custom">("today");
   const [customDate, setCustomDate] = useState("");
+  const payAccounts = accountsForMethod(
+    accounts,
+    cardPay ? "CC" : paying?.paymentMethod
+  );
 
   function openPay(p: Pending) {
     setCardPay(null);
     setPaying(p);
     setPayError("");
-    setPayAccountId(accounts.length === 1 ? accounts[0].id : "");
+    const choices = accountsForMethod(accounts, p.paymentMethod);
+    setPayAccountId(choices.length === 1 ? choices[0].id : "");
     setDateMode("today");
-    setCustomDate(toDateInputValue(new Date(p.dueDate)));
+    setCustomDate(
+      p.dueDate
+        ? toDateInputValue(new Date(p.dueDate))
+        : toDateInputValue(new Date())
+    );
   }
 
   function openCardPay(bill: CardBill) {
@@ -85,7 +98,8 @@ export default function DuesPage() {
     setCardPay(bill);
     setPayError("");
     setPayAmount(bill.owed > 0 ? String(bill.owed) : "");
-    setPayAccountId(accounts.length === 1 ? accounts[0].id : "");
+    const choices = accountsForMethod(accounts, "CC");
+    setPayAccountId(choices.length === 1 ? choices[0].id : "");
   }
 
   async function confirmPay() {
@@ -235,31 +249,38 @@ export default function DuesPage() {
             >
               <div className="min-w-0 space-y-1">
                 <p className="font-medium text-stone-900 dark:text-stone-100">
-                  {p.title}
+                  {p.category === "DUE" ? p.payee || "Due" : p.title}
                 </p>
                 <div className="flex flex-wrap gap-1.5 text-xs text-stone-500 dark:text-stone-400">
-                  {p.payee && <Badge>To: {p.payee}</Badge>}
-                  {p.investment ? (
-                    <Badge>
-                      {p.investment.kind === "RD"
-                        ? "RD"
-                        : p.investment.kind === "MF"
-                          ? "SIP"
-                          : "Invest"}
-                    </Badge>
-                  ) : p.investmentId ? (
-                    <Badge>Invest</Badge>
-                  ) : p.type === "CREDIT" ? (
-                    <Badge variant="credit">Income</Badge>
+                  {p.category === "DUE" ? (
+                    <Badge>Due</Badge>
                   ) : (
-                    p.paymentMethod && (
-                      <Badge variant="default">{p.paymentMethod}</Badge>
-                    )
+                    <>
+                      {p.payee && <Badge>To: {p.payee}</Badge>}
+                      {p.investment ? (
+                        <Badge>
+                          {p.investment.kind === "RD"
+                            ? "RD"
+                            : p.investment.kind === "MF"
+                              ? "SIP"
+                              : "Invest"}
+                        </Badge>
+                      ) : p.investmentId ? (
+                        <Badge>Invest</Badge>
+                      ) : p.type === "CREDIT" ? (
+                        <Badge variant="credit">Income</Badge>
+                      ) : (
+                        p.paymentMethod && (
+                          <Badge variant="default">{p.paymentMethod}</Badge>
+                        )
+                      )}
+                    </>
                   )}
-                  <span>
-                    Due {formatDueDate(p.dueDate)}
-                  </span>
-                  {p.totalMonths != null && (
+                  {p.category === "DUE" && p.investment?.name && (
+                    <span>{p.investment.name}</span>
+                  )}
+                  {p.dueDate && <span>Due {formatDueDate(p.dueDate)}</span>}
+                  {p.category !== "DUE" && p.totalMonths != null && (
                     <span>
                       EMI {p.paidCount}/{p.totalMonths}
                     </span>
@@ -323,7 +344,9 @@ export default function DuesPage() {
             <p className="text-sm text-stone-600 dark:text-stone-400">
               {cardPay
                 ? `${cardPay.name} · bill ${formatRupee(cardPay.owed)}`
-                : `${paying?.title ?? ""} · ${paying ? formatRupee(paying.amount) : ""}`}
+                : paying?.category === "DUE"
+                  ? `${paying.payee || "Due"} · ${formatRupee(paying.amount)}`
+                  : `${paying?.title ?? ""} · ${paying ? formatRupee(paying.amount) : ""}`}
             </p>
           </DialogHeader>
 
@@ -379,13 +402,13 @@ export default function DuesPage() {
                     : "Pay from"}
                 </Label>
                 <div className="mt-2">
-                  {accounts.length === 0 ? (
+                  {payAccounts.length === 0 ? (
                     <p className="text-sm text-stone-600 dark:text-stone-400">
-                      Add an account in More first.
+                      Add a bank account in More. Cash is only for cash.
                     </p>
                   ) : (
                     <AccountPicker
-                      accounts={accounts}
+                      accounts={payAccounts}
                       value={payAccountId}
                       onChange={setPayAccountId}
                     />

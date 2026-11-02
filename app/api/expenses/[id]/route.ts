@@ -61,6 +61,12 @@ export async function PATCH(req: Request, { params }: Params) {
     if (!account) {
       return NextResponse.json({ error: "Invalid account" }, { status: 400 });
     }
+    if (paymentMethod === "UPI" && account.name === "Cash") {
+      return NextResponse.json(
+        { error: "Cash can't be used for UPI" },
+        { status: 400 }
+      );
+    }
     accountId = account.id;
   } else if (!cardId) {
     const accountCount = await prisma.moneyAccount.count({

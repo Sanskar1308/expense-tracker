@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -13,6 +13,7 @@ import {
   useMoves,
 } from "../../hooks/useFinanceQueries";
 import MoveList from "./MoveList";
+import { accountsForPicker } from "../AccountPicker";
 
 export default function AccountsManager() {
   const { data } = useAccounts();
@@ -20,7 +21,7 @@ export default function AccountsManager() {
   const { data: moves = [] } = useMoves();
   const invalidate = useInvalidateMoney();
   const accounts = data?.accounts ?? [];
-  const active = accounts.filter((a) => a.isActive);
+  const active = accountsForPicker(accounts);
 
   const [name, setName] = useState("");
   const [opening, setOpening] = useState("");
@@ -111,23 +112,14 @@ export default function AccountsManager() {
 
       <ul className="divide-y divide-stone-100 dark:divide-stone-800">
         {accounts.map((a) => (
-          <li key={a.id} className="flex items-center justify-between gap-2 py-2 text-sm">
-            <span className={a.isActive ? "" : "text-stone-400"}>
-              {a.name}
-              {a.isActive ? "" : " · hidden"}
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="font-medium">{formatRupee(a.balance)}</span>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => toggle(a.id, a.isActive)}
-              >
-                {a.isActive ? "Hide" : "Show"}
-              </Button>
-            </span>
-          </li>
+          <AccountRow
+            key={a.id}
+            account={a}
+            onToggle={() => toggle(a.id, a.isActive)}
+            onChanged={invalidate}
+            onError={setError}
+            onMessage={setMessage}
+          />
         ))}
         {accounts.length === 0 && (
           <li className="py-2 text-sm text-stone-500">No accounts yet.</li>
@@ -242,5 +234,90 @@ export default function AccountsManager() {
       {message && <p className="text-sm text-emerald-700">{message}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </section>
+  );
+}
+
+function AccountRow({
+  account,
+  onToggle,
+  onChanged,
+  onError,
+  onMessage,
+}: {
+  account: { id: string; name: string; isActive: boolean; balance: number };
+  onToggle: () => void;
+  onChanged: () => Promise<unknown>;
+  onError: (message: string) => void;
+  onMessage: (message: string) => void;
+}) {
+  const [balance, setBalance] = useState(String(account.balance));
+  useEffect(() => {
+    setBalance(String(account.balance));
+  }, [account.balance]);
+
+  async function saveBalance() {
+    onError("");
+    onMessage("");
+    const next = parseFloat(balance);
+    if (!Number.isFinite(next)) {
+      onError("Enter a balance");
+      return;
+    }
+    try {
+      await apiSend(`/api/accounts/${account.id}`, "PATCH", { balance: next });
+      onMessage("Balance updated");
+      await onChanged();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed");
+    }
+  }
+
+  async function remove() {
+    if (
+      !confirm(
+        `Delete ${account.name}? Transfers with it are undone. Spending stays, without this account.`
+      )
+    ) {
+      return;
+    }
+    onError("");
+    try {
+      await apiSend(`/api/accounts/${account.id}`, "DELETE");
+      onMessage("Account deleted");
+      await onChanged();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed");
+    }
+  }
+
+  return (
+    <li className="space-y-2 py-2 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className={account.isActive ? "" : "text-stone-400"}>
+          {account.name}
+          {account.isActive ? "" : " · hidden"}
+        </span>
+        <span className="font-medium">{formatRupee(account.balance)}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          className="w-32"
+          type="number"
+          step="0.01"
+          value={balance}
+          onChange={(e) => setBalance(e.target.value)}
+          aria-label={`${account.name} balance`}
+        />
+        <Button type="button" size="sm" variant="outline" onClick={saveBalance}>
+          Save balance
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onToggle}>
+          {account.isActive ? "Hide" : "Show"}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={remove}>
+          Delete
+        </Button>
+      </div>
+    </li>
   );
 }

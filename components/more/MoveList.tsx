@@ -24,6 +24,7 @@ export default function MoveList({
           <span className="text-stone-700 dark:text-stone-300">
             {formatDueDate(m.createdAt)} · {m.fromName} → {m.toName} ·{" "}
             {formatRupee(m.amount)}
+            {m.grams != null && m.grams > 0 ? ` · ${m.grams} g` : ""}
             {m.note ? ` · ${m.note}` : ""}
           </span>
           <Button type="button" size="sm" variant="ghost" onClick={() => onUndo(m.id)}>

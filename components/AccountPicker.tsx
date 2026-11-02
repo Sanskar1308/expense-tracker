@@ -2,6 +2,26 @@
 
 import { Button } from "./ui/button";
 
+export function accountsForPicker<T extends { name: string; isActive?: boolean }>(
+  accounts: T[]
+) {
+  return accounts
+    .filter((a) => a.isActive !== false || a.name === "Cash")
+    .sort((a, b) => Number(b.name === "Cash") - Number(a.name === "Cash"));
+}
+
+/** Cash is only a cash-payment account. UPI and card never offer it. */
+export function accountsForMethod<T extends { name: string; isActive?: boolean }>(
+  accounts: T[],
+  method: string | null | undefined
+) {
+  const list = accountsForPicker(accounts);
+  if (method === "UPI" || method === "CC") {
+    return list.filter((a) => a.name !== "Cash");
+  }
+  return list;
+}
+
 export default function AccountPicker({
   accounts,
   value,
@@ -11,7 +31,7 @@ export default function AccountPicker({
   value: string;
   onChange: (id: string) => void;
 }) {
-  const list = accounts.filter((a) => a.isActive !== false);
+  const list = accountsForPicker(accounts);
   if (list.length === 0) return null;
 
   return (

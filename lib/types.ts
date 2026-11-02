@@ -52,6 +52,7 @@ export type LedgerMoveRow = {
   toName: string;
   cardId?: string | null;
   investmentId: string | null;
+  grams?: number | null;
 };
 
 export type MoneyAccountRow = {

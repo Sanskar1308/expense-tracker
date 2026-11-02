@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   const rules = await prisma.recurringRule.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, category: { not: "DUE" } },
     orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
     include: {
       _count: { select: { pendings: { where: { status: "PAID" } } } },
@@ -109,6 +109,12 @@ export async function POST(req: Request) {
       }
       if (body.accountId && !account) {
         return NextResponse.json({ error: "Invalid account" }, { status: 400 });
+      }
+      if (paymentMethod === "UPI" && account?.name === "Cash") {
+        return NextResponse.json(
+          { error: "Cash can't be used for UPI" },
+          { status: 400 }
+        );
       }
       accountId = account?.id ?? null;
     }

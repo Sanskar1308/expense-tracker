@@ -4,6 +4,7 @@ import { prisma } from "../../../lib/prisma";
 import { requireUser } from "../../../lib/session-user";
 import { roundMoney } from "../../../lib/balances";
 import { clampDayOfMonth, ensurePendingsForUser } from "../../../lib/dues";
+import { createOwedDue, parseDueDate } from "../../../lib/investment-due";
 
 const KINDS = new Set<string>(Object.values(InvestmentKind));
 
@@ -79,6 +80,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Monthly amount required" }, { status: 400 });
   }
 
+  const due = body.due;
+  let fromWhom = "";
+  let dueOn: Date | null = null;
+  if (due) {
+    fromWhom = String(due.fromWhom ?? "").trim();
+    if (!fromWhom) {
+      return NextResponse.json({ error: "From whom required" }, { status: 400 });
+    }
+    if (!(investedAmount > 0)) {
+      return NextResponse.json({ error: "Amount required" }, { status: 400 });
+    }
+    try {
+      dueOn = parseDueDate(due.dueDate);
+    } catch {
+      return NextResponse.json({ error: "Invalid due date" }, { status: 400 });
+    }
+  }
+
   const row = await prisma.$transaction(async (tx) => {
     const created = await tx.investment.create({
       data: {
@@ -102,6 +121,16 @@ export async function POST(req: Request) {
           dayOfMonth: clampDayOfMonth(Number(body.dayOfMonth) || 1),
           totalMonths,
         },
+      });
+    }
+    if (fromWhom) {
+      await createOwedDue(tx, {
+        userId: user.id,
+        investmentId: created.id,
+        title: name,
+        amount: investedAmount,
+        fromWhom,
+        dueDate: dueOn,
       });
     }
     return created;

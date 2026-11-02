@@ -33,6 +33,7 @@ export async function GET() {
       toName: m.toAccount?.name ?? m.card?.name ?? m.investment?.name ?? "Removed",
       cardId: m.cardId,
       investmentId: m.investmentId,
+      grams: m.grams,
     }))
   );
 }
@@ -77,6 +78,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid account" }, { status: 400 });
     }
   }
+  if (cardId && from.name === "Cash") {
+    return NextResponse.json(
+      { error: "Cash can't be used for a card" },
+      { status: 400 }
+    );
+  }
   if (cardId) {
     const card = await prisma.creditCard.findFirst({
       where: { id: cardId, userId: user.id },
@@ -95,12 +102,23 @@ export async function POST(req: Request) {
     if (!inv) {
       return NextResponse.json({ error: "Invalid investment" }, { status: 400 });
     }
+    let grams: number | null = null;
+    if (body.grams != null && body.grams !== "") {
+      grams = Number(body.grams);
+      if (!Number.isFinite(grams) || grams < 0) {
+        return NextResponse.json({ error: "Invalid grams" }, { status: 400 });
+      }
+      if (grams === 0) grams = null;
+    }
+    const tracksGrams = inv.kind === "GOLD" || inv.kind === "SILVER";
+    if (grams != null && !tracksGrams) grams = null;
     const move = await prisma.$transaction(async (tx) => {
       const created = await tx.ledgerMove.create({
         data: {
           userId: user.id,
           amount,
           note,
+          grams,
           fromAccountId: from.id,
           investmentId: inv.id,
         },
@@ -110,6 +128,7 @@ export async function POST(req: Request) {
         data: {
           investedAmount: inv.investedAmount + amount,
           currentValue: inv.currentValue + amount,
+          ...(grams != null ? { grams: (inv.grams ?? 0) + grams } : {}),
         },
       });
       return created;

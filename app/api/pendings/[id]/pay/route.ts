@@ -51,7 +51,10 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Already processed" }, { status: 400 });
   }
 
-  const investmentId = pending.investmentId ?? pending.rule.investmentId;
+  const isDue = pending.category === "DUE";
+  const investmentId = isDue
+    ? null
+    : (pending.investmentId ?? pending.rule.investmentId);
   const isCard = pending.paymentMethod === "CC" || !!pending.cardId;
   let accountId: string | null = null;
 
@@ -66,6 +69,12 @@ export async function POST(req: Request, { params }: Params) {
     }
     if (chosen && !account) {
       return NextResponse.json({ error: "Invalid account" }, { status: 400 });
+    }
+    if (pending.paymentMethod === "UPI" && account?.name === "Cash") {
+      return NextResponse.json(
+        { error: "Cash can't be used for UPI" },
+        { status: 400 }
+      );
     }
     accountId = account?.id ?? null;
   }
@@ -128,11 +137,12 @@ export async function POST(req: Request, { params }: Params) {
     const expense = await tx.expense.create({
       data: {
         userId: user.id,
-        title: pending.title,
+        title:
+          isDue && pending.payee ? `Due · ${pending.payee}` : pending.title,
         amount: pending.amount,
         category: pending.category,
         type: pending.type,
-        paymentMethod: pending.paymentMethod,
+        paymentMethod: isDue ? "CASH" : pending.paymentMethod,
         cardId: pending.cardId,
         accountId: pending.cardId ? null : accountId,
         createdAt: paidAt,

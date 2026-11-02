@@ -2,23 +2,28 @@ import { prisma } from "./prisma";
 
 /** First time someone already has cash history, park it in one account. */
 export async function ensureMoneyAccounts(userId: string) {
-  const count = await prisma.moneyAccount.count({ where: { userId } });
-  if (count > 0) return;
-
-  const loose = await prisma.expense.count({
-    where: {
-      userId,
-      accountId: null,
-      OR: [
-        { type: "CREDIT" },
-        { paymentMethod: { in: ["CASH", "UPI"] } },
-      ],
-    },
+  const legacy = await prisma.moneyAccount.findFirst({
+    where: { userId, name: "Cash & UPI" },
   });
-  if (loose === 0) return;
+  if (legacy) {
+    const cash = await prisma.moneyAccount.findFirst({
+      where: { userId, name: "Cash" },
+    });
+    if (!cash) {
+      await prisma.moneyAccount.update({
+        where: { id: legacy.id },
+        data: { name: "Cash" },
+      });
+    }
+  }
+
+  const cash = await prisma.moneyAccount.findFirst({
+    where: { userId, name: "Cash" },
+  });
+  if (cash) return;
 
   const account = await prisma.moneyAccount.create({
-    data: { userId, name: "Cash & UPI", openingBalance: 0 },
+    data: { userId, name: "Cash", openingBalance: 0 },
   });
   await prisma.expense.updateMany({
     where: {

@@ -18,6 +18,7 @@ import {
   useMoves,
 } from "../../hooks/useFinanceQueries";
 import MoveList from "./MoveList";
+import { accountsForPicker } from "../AccountPicker";
 
 function kindLabel(kind: string) {
   return INVESTMENT_KINDS.find((k) => k.value === kind)?.label ?? kind;
@@ -28,7 +29,7 @@ export default function InvestmentsManager() {
   const { data: accountData } = useAccounts();
   const { data: moves = [] } = useMoves();
   const invalidate = useInvalidateMoney();
-  const accounts = (accountData?.accounts ?? []).filter((a) => a.isActive);
+  const accounts = accountsForPicker(accountData?.accounts ?? []);
 
   const [name, setName] = useState("");
   const [kind, setKind] = useState<InvestmentRow["kind"]>("MF");
@@ -39,6 +40,9 @@ export default function InvestmentsManager() {
   const [monthlyAmount, setMonthlyAmount] = useState("");
   const [dayOfMonth, setDayOfMonth] = useState("1");
   const [totalMonths, setTotalMonths] = useState("");
+  const [funding, setFunding] = useState<"held" | "due">("held");
+  const [fromWhom, setFromWhom] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const asksSchedule = kind === "MF" || kind === "RD";
@@ -66,6 +70,14 @@ export default function InvestmentsManager() {
     setError("");
     setMessage("");
     const investedAmount = invested === "" ? 0 : parseFloat(invested);
+    if (funding === "due" && !(investedAmount > 0)) {
+      setError("Amount required");
+      return;
+    }
+    if (funding === "due" && !fromWhom.trim()) {
+      setError("From whom required");
+      return;
+    }
     try {
       await apiSend("/api/investments", "POST", {
         name,
@@ -77,6 +89,10 @@ export default function InvestmentsManager() {
         monthlyAmount: schedule === "monthly" ? parseFloat(monthlyAmount) : null,
         dayOfMonth: parseInt(dayOfMonth, 10),
         totalMonths: totalMonths ? parseInt(totalMonths, 10) : null,
+        due:
+          funding === "due"
+            ? { fromWhom: fromWhom.trim(), dueDate: dueDate || null }
+            : null,
       });
       setName("");
       setInvested("");
@@ -84,7 +100,16 @@ export default function InvestmentsManager() {
       setGrams("");
       setMonthlyAmount("");
       setTotalMonths("");
-      setMessage(schedule === "monthly" && asksSchedule ? "Added. The cut is in Dues." : "Added");
+      setFromWhom("");
+      setDueDate("");
+      setFunding("held");
+      setMessage(
+        funding === "due"
+          ? "Added. It is in Dues."
+          : schedule === "monthly" && asksSchedule
+            ? "Added. The cut is in Dues."
+            : "Added"
+      );
       await invalidate();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -100,7 +125,9 @@ export default function InvestmentsManager() {
         <p className="text-sm text-stone-600 dark:text-stone-400">
           Mutual fund, stock, FD, RD, PPF, gold. For a mutual fund or RD, choose
           one time or SIP. A SIP shows under Dues each month. You pick the
-          account when you mark it paid.
+          account when you mark it paid. Due means the money is already in the
+          holding and someone still owes it — type who, and a date only if you
+          have one.
         </p>
       </div>
 
@@ -172,6 +199,53 @@ export default function InvestmentsManager() {
               placeholder="Same as invested if blank"
             />
           </div>
+        </div>
+        <div className="space-y-2">
+          <Label>This amount</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={funding === "held" ? "default" : "outline"}
+              onClick={() => setFunding("held")}
+            >
+              Already in
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={funding === "due" ? "default" : "outline"}
+              onClick={() => setFunding("due")}
+            >
+              Due
+            </Button>
+          </div>
+          {funding === "due" && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <Label>From whom</Label>
+                <Input
+                  className="mt-1"
+                  value={fromWhom}
+                  onChange={(e) => setFromWhom(e.target.value)}
+                  placeholder="Rahul"
+                  required
+                />
+              </div>
+              <div>
+                <Label>Due date</Label>
+                <Input
+                  className="mt-1"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-stone-500">
+                  Optional. Leave blank if there is no date.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
         {tracksGrams && (
           <div>
@@ -281,7 +355,10 @@ function Holding({
   const [amount, setAmount] = useState("");
   const [monthlyAmount, setMonthlyAmount] = useState("");
   const [dayOfMonth, setDayOfMonth] = useState("1");
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "due");
+  const [fromWhom, setFromWhom] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [addGrams, setAddGrams] = useState("");
   useEffect(() => {
     if (!accountId && accounts[0]) setAccountId(accounts[0].id);
   }, [accounts, accountId]);
@@ -324,13 +401,34 @@ function Holding({
   async function contribute(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    let grams: number | null = null;
+    if (tracksGrams && addGrams.trim() !== "") {
+      grams = parseFloat(addGrams);
+      if (!Number.isFinite(grams) || grams < 0) {
+        setError("Invalid grams");
+        return;
+      }
+    }
     try {
-      await apiSend("/api/moves", "POST", {
-        fromAccountId: accountId,
-        investmentId: row.id,
-        amount: parseFloat(amount),
-      });
+      if (accountId === "due") {
+        await apiSend(`/api/investments/${row.id}/due`, "POST", {
+          amount: parseFloat(amount),
+          fromWhom: fromWhom.trim(),
+          dueDate: dueDate || null,
+          grams,
+        });
+        setFromWhom("");
+        setDueDate("");
+      } else {
+        await apiSend("/api/moves", "POST", {
+          fromAccountId: accountId,
+          investmentId: row.id,
+          amount: parseFloat(amount),
+          grams,
+        });
+      }
       setAmount("");
+      setAddGrams("");
       await onChange();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -432,39 +530,75 @@ function Holding({
           </Button>
         </form>
       )}
-      {accounts.length > 0 && (
-        <form onSubmit={contribute} className="flex flex-wrap items-end gap-2">
+      <form onSubmit={contribute} className="flex flex-wrap items-end gap-2">
+        <div>
+          <Label>Add from</Label>
+          <select
+            className="mt-1 flex h-10 rounded-md border border-stone-300 bg-white px-3 text-sm dark:border-stone-600 dark:bg-stone-900"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+          >
+            <option value="due">Due</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {accountId === "due" && (
+          <>
+            <div>
+              <Label>From whom</Label>
+              <Input
+                className="mt-1 w-36"
+                value={fromWhom}
+                onChange={(e) => setFromWhom(e.target.value)}
+                placeholder="Rahul"
+                required
+              />
+            </div>
+            <div>
+              <Label>Due date</Label>
+              <Input
+                className="mt-1 w-40"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+        <div>
+          <Label>Amount</Label>
+          <Input
+            className="mt-1 w-32"
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+        </div>
+        {tracksGrams && (
           <div>
-            <Label>Add from</Label>
-            <select
-              className="mt-1 flex h-10 rounded-md border border-stone-300 bg-white px-3 text-sm dark:border-stone-600 dark:bg-stone-900"
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <Label>Amount</Label>
+            <Label>Grams</Label>
             <Input
-              className="mt-1 w-32"
+              className="mt-1 w-28"
               type="number"
-              min="0.01"
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
+              min="0"
+              step="0.001"
+              value={addGrams}
+              onChange={(e) => setAddGrams(e.target.value)}
+              placeholder="Add"
             />
           </div>
-          <Button type="submit" size="sm">
-            Add
-          </Button>
-        </form>
-      )}
+        )}
+        <Button type="submit" size="sm">
+          Add
+        </Button>
+      </form>
       <MoveList moves={moves} onUndo={(id) => void onUndo(id)} />
       {error && <p className="text-sm text-red-600">{error}</p>}
     </li>
